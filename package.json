@@ -5,6 +5,7 @@
   "description": "Portal de gestão da Atlética Computação e Exatas",
   "scripts": {
     "start": "node backend/server.js",
+    "test": "node --test backend/test/*.test.js",
     "db:generate": "prisma generate --config backend/prisma.config.ts",
     "db:migrate": "prisma migrate dev --config backend/prisma.config.ts",
     "db:seed": "node backend/prisma/seed.js"
