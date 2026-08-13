@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Patrimônio — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="patrimonio"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Patrimônio</p><h1>Itens e equipamentos</h1><p>Inventário físico da atlética.</p></div>
+    <button id="new-asset" class="btn btn-primary">+ Novo item</button>
+  </header>
+
+  <section class="grid grid-3" style="margin-bottom:18px">
+    <article class="metric-card"><p>Unidades no total</p><strong id="metric-total">--</strong></article>
+    <article class="metric-card"><p>Itens cadastrados</p><strong id="metric-items">--</strong></article>
+    <article class="metric-card"><p>Precisam de atenção</p><strong id="metric-attention">--</strong></article>
+  </section>
+
+  <div class="tabs" style="display:flex;gap:12px;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:8px">
+    <button class="btn btn-ghost active" id="tab-inventory" style="border:0;background:none;font-weight:700;cursor:pointer">Inventário</button>
+    <button class="btn btn-ghost" id="tab-loans" style="border:0;background:none;color:var(--muted);cursor:pointer">Empréstimos & Termos</button>
+  </div>
+
+  <section class="card" id="section-inventory">
+    <div class="toolbar"><input type="search" id="search" placeholder="Buscar por nome, categoria ou esporte…"></div>
+    <div id="list"></div>
+  </section>
+
+  <section class="card" id="section-loans" style="display:none">
+    <div class="toolbar" style="justify-content:space-between">
+      <input type="search" id="search-loans" placeholder="Buscar empréstimo...">
+      <button id="btn-new-loan" class="btn btn-primary btn-sm">+ Novo Empréstimo (Termo)</button>
+    </div>
+    <div id="loans-list"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="loan-modal">
+  <form class="modal" id="loan-form" style="width:min(94vw,560px)">
+    <button type="button" class="modal-close-btn" id="close-loan-x" aria-label="Fechar">×</button>
+    <h2>Termo de Liberação & Empréstimo</h2>
+    <p class="modal-sub">Emissão de termo com aceite digital e assinatura online do responsável.</p>
+    <div class="field"><label>Item do Patrimônio</label><select id="loan-asset-id" required></select></div>
+    <div class="field-row">
+      <div class="field"><label>Nome do Responsável</label><input id="borrower-name" required placeholder="Nome do atleta/diretor"></div>
+      <div class="field"><label>CPF / Matrícula</label><input id="borrower-doc" placeholder="000.000.000-00"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Telefone / WhatsApp</label><input id="borrower-phone" placeholder="(11) 99999-9999"></div>
+      <div class="field"><label>Quantidade Emprestada</label><input id="loan-quantity" type="number" min="1" value="1" required></div>
+    </div>
+    <div class="field"><label>Data Prevista para Devolução</label><input id="loan-expected-return" type="date"></div>
+    
+    <div class="field" style="background:#f8fafc;padding:12px;border:1px solid var(--line);border-radius:8px;margin-top:10px">
+      <label style="margin-bottom:4px;font-weight:700">Termo de Responsabilidade e Aceite Digital</label>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 8px">
+        Declaro ter recebido os itens acima em perfeito estado de conservação e me comprometo a devolvê-los na data estipulada, sob pena de ressarcimento em caso de dano ou perda.
+      </p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="accept-terms" required checked> Li e aceito os termos de liberação
+      </label>
+    </div>
+
+    <div class="field" style="margin-top:10px">
+      <label style="display:flex;justify-content:space-between;align-items:center">
+        <span>Assinatura Digital (Desenhe abaixo)</span>
+        <button type="button" id="clear-signature" style="border:0;background:none;color:var(--danger);font-size:11px;cursor:pointer">Limpar</button>
+      </label>
+      <div style="border:1px dashed var(--blue);border-radius:8px;background:#fff;overflow:hidden">
+        <canvas id="signature-pad" width="500" height="120" style="width:100%;height:120px;display:block;cursor:crosshair"></canvas>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close-loan-modal">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Emitir e Registrar</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <form class="modal" id="form">
+    <button type="button" class="modal-close-btn" id="close-x" aria-label="Fechar">×</button>
+    <input type="hidden" id="asset-id">
+    <h2 id="modal-title">Novo item</h2>
+    <div class="field"><label>Nome</label><input id="name" required placeholder="Ex: Bola de Futsal Penalty"></div>
+    <div class="field-row">
+      <div class="field"><label>Categoria</label><input id="category" placeholder="Uniformes, equipamentos…" required></div>
+      <div class="field"><label>Quantidade</label><input id="quantity" type="number" min="1" value="1" required></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Modalidade (Esporte)</label>
+        <select id="sport">
+          <option value="">Geral / Nenhuma</option>
+          <option value="Futsal">Futsal</option>
+          <option value="Campo">Futebol de Campo</option>
+          <option value="Vôlei">Vôlei</option>
+          <option value="Basquete">Basquete</option>
+          <option value="Handebol">Handebol</option>
+          <option value="Natação">Natação</option>
+          <option value="Atletismo">Atletismo</option>
+          <option value="Tênis de Mesa">Tênis de Mesa</option>
+          <option value="Xadrez">Xadrez</option>
+          <option value="Cheerleading">Cheerleading</option>
+        </select>
+      </div>
+      <div class="field"><label>Naipe (Sexo)</label>
+        <select id="gender">
+          <option value="">Nenhum / Ambos</option>
+          <option value="MASCULINO">Masculino</option>
+          <option value="FEMININO">Feminino</option>
+          <option value="MISTA">Misto</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Estado de conservação</label>
+        <select id="condition"><option value="OTIMO">Ótimo</option><option value="BOM" selected>Bom</option><option value="REGULAR">Regular</option><option value="RUIM">Ruim</option></select>
+      </div>
+      <div class="field"><label>Local</label><input id="location" placeholder="Almoxarifado, sede…"></div>
+    </div>
+    <div class="field"><label>Observações</label><input id="notes" placeholder="Detalhes adicionais, patrimônio numérico..."></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="submit-btn">Cadastrar</button>
+    </div>
+  </form>
+</div>
+<script src="/gestao/patrimonio.js"></script>
+</body>
+</html>

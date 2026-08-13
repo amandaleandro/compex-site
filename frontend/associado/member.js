@@ -1,0 +1,18 @@
+const profileSettings=JSON.parse(localStorage.getItem('compex-associate-settings')||'{}');
+const statusLabels={ACTIVE:'Associação ativa',PENDING:'Associação pendente',EXPIRED:'Associação expirada'};
+const avatar=document.querySelector('.avatar');
+if(profileSettings.photo&&avatar){avatar.style.backgroundImage=`url(${profileSettings.photo})`;avatar.style.backgroundSize='cover';avatar.style.backgroundPosition='center';avatar.textContent='';avatar.setAttribute('aria-label','Foto do associado');}
+const displayName=profileSettings.socialName||profileSettings.nickname||profileSettings.name;
+if(displayName){const name=document.querySelector('.person h2');if(name)name.textContent=displayName;const account=document.querySelector('.profile-link');if(account)account.textContent=`♙  ${displayName} · Minha conta`;}
+fetch('/api/me/subscription',{headers:{Authorization:`Bearer ${sessionStorage.getItem('compex-token')||''}`}}).then(response=>response.ok?response.json():null).then(subscription=>{if(!subscription)return;const badge=document.querySelector('.card-front .active');if(badge)badge.textContent=`✓ ${statusLabels[subscription.status]||subscription.status}`;}).catch(()=>{});
+fetch('/api/me/profile',{headers:{Authorization:`Bearer ${sessionStorage.getItem('compex-token')||''}`}}).then(response=>response.ok?response.json():null).then(profile=>{if(!profile)return;if(profile.membershipKind==='AVULSO'){const wrap=document.querySelector('#id-card')?.closest('section')||document.querySelector('#id-card');if(wrap)wrap.innerHTML='<p style="padding:24px;color:#718096">A carteirinha digital é exclusiva para sócios. Seu cadastro é avulso (paga por treino/jogo) — <a href="/public/associate-signup.html">torne-se sócio</a> para desbloquear.</p>';return;}const display=profile.socialName||profile.nickname||profile.name;const name=document.querySelector('.person h2');if(name&&display)name.textContent=display;const course=document.querySelector('#member-course');if(course&&profile.course)course.textContent=profile.course;const registration=document.querySelector('#member-registration');if(registration&&profile.registration)registration.textContent=profile.registration;const since=document.querySelector('#member-since');if(since&&profile.createdAt)since.textContent=new Date(profile.createdAt).getFullYear();const category=document.querySelector('#member-category');if(category)category.textContent=profile.category==='ATLETA'?'ATLETA':'TORCEDOR';const sports=document.querySelector('#member-sports');if(sports&&profile.sports?.length)sports.textContent=profile.sports.join(' · ');const management=document.querySelector('#member-management');if(management&&profile.management)management.textContent=`GESTÃO · ${profile.management.role}`;if(profile.photoUrl&&avatar){avatar.style.backgroundImage=`url(${profile.photoUrl}?v=${Date.now()})`;avatar.style.backgroundSize='cover';avatar.style.backgroundPosition='center';avatar.textContent='';}}).catch(()=>{});
+const card=document.querySelector('#id-card');
+document.querySelector('.card-front .active').style.color='#fff';
+const qr=document.querySelector('#qr-image');
+const showQr=document.querySelector('#show-qr');
+const showFront=document.querySelector('#show-front');
+const flip=(back)=>{card.classList.toggle('is-back',back);showQr.hidden=back;showFront.hidden=!back;};
+qr.src='/api/qr?text=COMPEX-2026-0588&v=3';
+showQr.onclick=()=>flip(true);
+showFront.onclick=()=>flip(false);
+document.querySelector('#share').onclick=async()=>{if(navigator.share)await navigator.share({title:'Carteirinha CompExatas',text:'Carteirinha digital de Amanda L. Carmo',url:location.href});else{await navigator.clipboard?.writeText(location.href);document.querySelector('#share').textContent='Link copiado ✓'}};

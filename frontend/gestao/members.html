@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Associados — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="members"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Comunidade</p><h1>Associados</h1><p>Cadastro, planos e situação de cada associado.</p></div>
+    <button id="new-member" class="btn btn-primary">+ Novo associado</button>
+  </header>
+
+  <section class="grid grid-4" style="margin-bottom:18px">
+    <article class="metric-card"><p>Ativos</p><strong id="active-count">--</strong></article>
+    <article class="metric-card"><p>Pendentes</p><strong id="pending-count">--</strong></article>
+    <article class="metric-card"><p>Vencidos</p><strong id="expired-count">--</strong></article>
+    <article class="metric-card"><p>Novos este mês</p><strong id="new-count">--</strong></article>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar por nome ou curso…">
+      <select id="status">
+        <option value="all">Todas as situações</option>
+        <option value="active">Ativo</option>
+        <option value="pending">Pendente</option>
+        <option value="expired">Vencido</option>
+      </select>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Associado</th><th>Curso</th><th>Tipo</th><th>Modalidades</th><th>Situação</th><th></th></tr></thead>
+      <tbody id="members-list"></tbody>
+    </table>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modal">
+  <form class="modal" id="member-form">
+    <h2 id="member-modal-title">Novo associado</h2>
+    <input type="hidden" id="member-id">
+    <p class="modal-sub" id="member-modal-sub">Cria o cadastro e a conta de acesso do associado.</p>
+    <div class="field"><label>Nome</label><input id="name" required></div>
+    <div class="field"><label>E-mail</label><input id="email" type="email" required></div>
+    <div class="field-row">
+      <div class="field"><label>Curso</label><input id="course" required></div>
+      <div class="field"><label>Plano</label>
+        <select id="plan"><option value="Anual">Anual</option><option value="Semestral">Semestral</option><option value="Avulso">Avulso</option></select>
+      </div>
+    </div>
+    <div class="field" id="status-field" hidden>
+      <label>Situação</label>
+      <select id="member-status"><option value="active">Ativo</option><option value="pending">Pendente</option><option value="expired">Vencido</option></select>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="member-submit">Cadastrar</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-backdrop" id="detail-modal">
+  <div class="modal" style="width:min(94vw,620px)">
+    <div class="panel-head" style="margin-bottom:6px"><h2 id="detail-name">—</h2><button type="button" class="btn btn-ghost btn-sm" id="close-detail">Fechar</button></div>
+    <p class="modal-sub" id="detail-sub">—</p>
+    <div class="grid grid-2" style="margin-bottom:16px">
+      <div class="metric-card"><p>Modalidades</p><div id="detail-teams" style="margin-top:6px"></div></div>
+      <div class="metric-card"><p>Cobranças de treino/jogo</p><div id="detail-charges" style="margin-top:6px"></div></div>
+    </div>
+  </div>
+</div>
+<script src="/gestao/members.js"></script>
+</body>
+</html>

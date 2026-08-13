@@ -10,7 +10,7 @@ Depois abra `http://localhost:3100`.
 
 No Windows, você também pode iniciar pelo arquivo `start-compex.ps1`.
 
-Para testar o acesso, abra `http://localhost:3100/login.html` e use a conta de demonstração informada na tela.
+Para testar o acesso, abra `http://localhost:3100/public/login.html` e use a conta de demonstração informada na tela.
 
 Endpoints disponíveis:
 
@@ -29,6 +29,6 @@ Todos os recursos também aceitam `PUT /api/{recurso}` para edição e `DELETE /
 
 Os dados são persistidos em `data.json`. Esta é uma base local para a próxima etapa: autenticação, banco PostgreSQL e armazenamento de arquivos.
 
-No navegador, o arquivo `api-client.js` expõe `window.CompexAPI` com os métodos `health()`, `list(resource)` e `create(resource, data)`.
+No navegador, o arquivo `/shared/api-client.js` expõe `window.CompexAPI` com os métodos `health()`, `list(resource)` e `create(resource, data)`.
 
-Quando as páginas são abertas pelo servidor (`http://localhost:3100`), `api-bridge.js` sincroniza os dados das telas com a API e o PostgreSQL.
+Quando as páginas são abertas pelo servidor (`http://localhost:3100`), `/shared/api-bridge.js` sincroniza os dados das telas com a API e o PostgreSQL.

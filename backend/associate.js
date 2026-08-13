@@ -203,7 +203,7 @@ async function handleAssociateRoute(pathname, req, res) {
         body: {
           items: items.map(item => ({ id: item.product.id, title: item.product.name, quantity: item.quantity, unit_price: item.product.priceCents / 100, currency_id: 'BRL' })),
           external_reference: order.id,
-          back_urls: { success: `${baseUrl}/loja.html?status=success`, failure: `${baseUrl}/loja.html?status=failure`, pending: `${baseUrl}/loja.html?status=pending` },
+          back_urls: { success: `${baseUrl}/associado/loja.html?status=success`, failure: `${baseUrl}/associado/loja.html?status=failure`, pending: `${baseUrl}/associado/loja.html?status=pending` },
           notification_url: `${baseUrl}/api/webhooks/mercadopago`
         }
       });
@@ -228,7 +228,7 @@ async function handleAssociateRoute(pathname, req, res) {
           external_reference: member.id,
           payer_email: member.userEmail,
           auto_recurring: { frequency: plan.frequency, frequency_type: 'months', transaction_amount: plan.amount, currency_id: 'BRL' },
-          back_url: `${baseUrl}/mensalidade.html?status=success`,
+          back_url: `${baseUrl}/associado/mensalidade.html?status=success`,
           status: 'pending'
         }
       });

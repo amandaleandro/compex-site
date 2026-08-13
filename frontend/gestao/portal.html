@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portal de gestão — COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="inicio"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div>
+      <p class="eyebrow" id="today-date"></p>
+      <h1>Olá, <em data-user-name>diretoria</em> ✦</h1>
+      <p>O que você quer movimentar hoje?</p>
+    </div>
+    <div class="shell-profile">
+      <div class="who">
+        <strong data-user-name>Carregando…</strong>
+        <small data-user-role></small>
+      </div>
+      <div class="avatar" data-user-avatar>--</div>
+    </div>
+  </header>
+
+  <section class="card" style="background:linear-gradient(110deg,#050e22,#0d2a63 55%,#1769e8);color:#fff;border:0;margin-bottom:24px;padding:36px 44px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap">
+    <div>
+      <p class="eyebrow" style="color:#8fb6f7">COMPEX / GESTÃO 2026</p>
+      <h2 style="font-size:38px;line-height:1.05;letter-spacing:-.03em;margin:10px 0">Uma atlética<br><span style="color:#8fb6f7">em movimento.</span></h2>
+      <p style="color:#cbd8ec;font-size:13px;margin:0">Todos os módulos da operação em um só lugar.</p>
+    </div>
+    <a href="/gestao/dashboard.html" class="btn btn-ghost" style="background:transparent;color:#fff;border-color:#6aa1f5">Ver dashboard geral →</a>
+  </section>
+
+  <div class="panel-head" style="margin-bottom:14px">
+    <div><p class="eyebrow">MÓDULOS DA GESTÃO</p><h2 class="page-title">Escolha uma área</h2></div>
+  </div>
+  <div class="grid grid-3" style="margin-bottom:24px">
+    <a class="card" href="/gestao/members.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#eaf1fd;color:#1769e8">◎</span>
+      <div><strong style="display:block;font-size:15px">Associados</strong><small class="muted">Cadastros e carteirinhas</small></div>
+    </a>
+    <a class="card" href="/gestao/finance.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#fdf1de;color:#b5730e">R$</span>
+      <div><strong style="display:block;font-size:15px">Financeiro</strong><small class="muted">Fluxo de caixa e movimentações</small></div>
+    </a>
+    <a class="card" href="/gestao/sports.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#eaf1fd;color:#0f52c0">⌁</span>
+      <div><strong style="display:block;font-size:15px">Esportes</strong><small class="muted">Modalidades, atletas e treinos</small></div>
+    </a>
+    <a class="card" href="/gestao/event-manager.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#f2ecfd;color:#7650c9">◷</span>
+      <div><strong style="display:block;font-size:15px">Eventos</strong><small class="muted">Cadastro e link para o BoraFest</small></div>
+    </a>
+    <a class="card" href="/gestao/sponsors.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#fbe9e6;color:#c0392b">◈</span>
+      <div><strong style="display:block;font-size:15px">Patrocinadores</strong><small class="muted">Pipeline de patrocínio</small></div>
+    </a>
+    <a class="card" href="/gestao/communication.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#fdf1de;color:#b5730e">✦</span>
+      <div><strong style="display:block;font-size:15px">Comunicação</strong><small class="muted">Comunicados para a comunidade</small></div>
+    </a>
+    <a class="card" href="/gestao/tasks.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#e5f6ec;color:#0d8a4f">✓</span>
+      <div><strong style="display:block;font-size:15px">Tarefas</strong><small class="muted">Quadro da diretoria</small></div>
+    </a>
+    <a class="card" href="/gestao/documents.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#eef1f6;color:#101828">▤</span>
+      <div><strong style="display:block;font-size:15px">Documentos</strong><small class="muted">Arquivos, atas e enquetes</small></div>
+    </a>
+    <a class="card" href="/gestao/permissions.html" style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit">
+      <span class="metric-icon" style="background:#eaf1fd;color:#1769e8">⚙</span>
+      <div><strong style="display:block;font-size:15px">Permissões</strong><small class="muted">Papéis e acessos do sistema</small></div>
+    </a>
+  </div>
+
+  <div class="card" style="background:var(--navy);color:#fff;border:0">
+    <p class="eyebrow" style="color:#8fb6f7">ACESSO RÁPIDO</p>
+    <h2 style="font-size:22px;letter-spacing:-.02em;margin:6px 0 4px">Números em tempo real ficam no Dashboard.</h2>
+    <p class="muted" style="color:#a9bfdc;margin:0 0 16px">Associados ativos, caixa disponível, próximos eventos e mural da equipe.</p>
+    <a href="/gestao/dashboard.html" class="btn btn-primary">Abrir dashboard →</a>
+  </div>
+</main>
+<script>
+  document.getElementById('today-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+</script>
+</body>
+</html>

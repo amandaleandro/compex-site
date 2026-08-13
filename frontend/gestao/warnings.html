@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Advertências — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="warnings"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Diretoria</p><h1>Advertências</h1><p>Histórico disciplinar de contas da diretoria.</p></div>
+    <button id="new-warning" class="btn btn-primary">+ Novo registro</button>
+  </header>
+
+  <section class="grid grid-3" style="margin-bottom:18px">
+    <article class="metric-card"><p>Advertências</p><strong id="count-advertencia">--</strong></article>
+    <article class="metric-card"><p>Suspensões</p><strong id="count-suspensao">--</strong></article>
+    <article class="metric-card"><p>Desligamentos</p><strong id="count-desligamento">--</strong></article>
+  </section>
+
+  <section class="card">
+    <div class="panel-head"><h2>Registros</h2><span class="muted" id="count-label"></span></div>
+    <div id="warnings-list"></div>
+  </section>
+</main>
+
+<dialog id="warning-modal">
+  <form id="warning-form" class="modal" style="width:min(92vw,440px)">
+    <h2>Novo registro</h2>
+    <div class="field"><label>Conta</label><select id="w-user" required></select></div>
+    <div class="field"><label>Tipo</label>
+      <select id="w-type"><option value="ADVERTENCIA">Advertência</option><option value="SUSPENSAO">Suspensão</option><option value="DESLIGAMENTO">Desligamento</option></select>
+    </div>
+    <div class="field"><label>Motivo</label><textarea id="w-reason" rows="3" required></textarea></div>
+    <p id="w-error" class="modal-error"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="w-cancel">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Registrar</button>
+    </div>
+  </form>
+</dialog>
+<script src="/gestao/warnings.js"></script>
+</body>
+</html>

@@ -29,8 +29,8 @@ http://localhost:3100
 ## Acessos
 
 - Site público: `http://localhost:3100`
-- Portal da diretoria: `http://localhost:3100/portal.html`
-- Login: `http://localhost:3100/login.html`
+- Portal da diretoria: `http://localhost:3100/gestao/portal.html`
+- Login: `http://localhost:3100/public/login.html`
 - API: `http://localhost:3100/api/health`
 
 Conta de demonstração:

@@ -1,0 +1,11 @@
+const modal = document.querySelector('#login-modal');
+const openers = document.querySelectorAll('[data-open-login]');
+const closer = document.querySelector('[data-close-login]');
+openers.forEach((button) => button.addEventListener('click', () => { modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }));
+const closeModal = () => { modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; };
+closer.addEventListener('click', closeModal);
+modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+document.querySelector('.menu-button').addEventListener('click', () => document.querySelector('.nav').classList.toggle('mobile-open'));
+const loginButton = document.querySelector('.modal .full');
+loginButton.addEventListener('click', (event) => { event.preventDefault(); window.location.href = '/public/login.html'; });

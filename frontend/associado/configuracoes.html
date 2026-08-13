@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configurações — COMPEX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/associado/settings.css">
+</head>
+<body>
+  <header class="member-topbar">
+    <a class="brand" href="/associado/portal-associado.html"><img src="/public/assets/compex-logo.png?v=5" alt="COMPEX"><span>ATLÉTICA<br><b>COMPUTAÇÃO<br>E EXATAS</b><small>UFU</small></span></a>
+    <nav><a href="/associado/portal-associado.html">Início</a><a href="/associado/agenda.html">Eventos</a><a href="/associado/carteirinha.html">Carteirinha</a><a href="/associado/beneficios-associado.html">Benefícios</a><a href="/associado/notificacoes.html">Notificações</a></nav>
+    <a class="profile-link" href="/associado/configuracoes.html">♙ &nbsp; Amanda Silva · Minha conta</a><a class="exit" href="/public/index.html">Sair ↗</a>
+  </header>
+  <main>
+    <div class="title"><div><p class="eyebrow">MINHA COMPEX / CONTA</p><h1>Seu espaço,<br><em>do seu jeito.</em></h1><p>Atualize seus dados e preferências da conta.</p></div><button id="save" class="primary" type="button">Salvar alterações</button></div>
+    <section class="layout">
+      <nav class="tabs" role="tablist" aria-label="Configurações da conta">
+        <button class="active" type="button" role="tab" aria-selected="true" data-tab="profile">Perfil</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="notifications">Notificações</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="security">Segurança</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="privacy">Privacidade</button>
+      </nav>
+      <div class="content">
+        <section class="panel tab-panel" id="profile" role="tabpanel"><p class="eyebrow">INFORMAÇÕES PESSOAIS</p><h2>Perfil</h2><div class="profile-top"><div class="photo">AS<button id="change-photo" type="button" aria-label="Alterar foto">+</button></div><div><b>Amanda Silva</b><small>Associada desde agosto de 2024</small><span class="status">● Associação ativa</span></div></div><div class="form-grid"><label>Nome completo<input name="name" value="Amanda Silva"></label><label>E-mail<input name="email" type="email" value="amanda@universidade.br"></label><label>Curso<select name="course"><option>Computação</option><option>Matemática</option><option>Física</option></select></label><label>Matrícula<input name="registration" value="20231234"></label><label>Instagram<input name="instagram" placeholder="@seuusuario"></label><label>Telefone<input name="phone" placeholder="(34) 99999-9999"></label></div></section>
+        <section class="panel tab-panel" id="notifications" role="tabpanel" hidden><p class="eyebrow">PREFERÊNCIAS</p><h2>Como você quer receber novidades?</h2><div class="toggle-row"><div><b>Comunicados da COMPEX</b><small>Informações importantes da diretoria</small></div><button class="toggle on" type="button" aria-pressed="true"><i></i></button></div><div class="toggle-row"><div><b>Eventos e festas</b><small>Novidades, datas e lembretes</small></div><button class="toggle on" type="button" aria-pressed="true"><i></i></button></div><div class="toggle-row"><div><b>Oportunidades e benefícios</b><small>Descontos e parceiros da atlética</small></div><button class="toggle" type="button" aria-pressed="false"><i></i></button></div></section>
+        <section class="panel tab-panel" id="security" role="tabpanel" hidden><p class="eyebrow">PROTEÇÃO DA CONTA</p><h2>Segurança</h2><form id="password-form" class="security-form"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>Nova senha<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirmar nova senha<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="outline" type="submit">Atualizar senha</button><p id="password-message" class="form-message" aria-live="polite"></p></form></section>
+        <section class="panel tab-panel" id="privacy" role="tabpanel" hidden><p class="eyebrow">CONTROLE DE DADOS</p><h2>Privacidade</h2><div class="toggle-row"><div><b>Exibir meu perfil nos times</b><small>Permite que outros associados encontrem você nas modalidades.</small></div><button class="toggle on" type="button" aria-pressed="true"><i></i></button></div><div class="toggle-row"><div><b>Compartilhar presença em eventos</b><small>Mostra sua confirmação para a organização do evento.</small></div><button class="toggle" type="button" aria-pressed="false"><i></i></button></div></section>
+      </div>
+    </section>
+    <div class="danger"><div><p class="eyebrow">ZONA DE SEGURANÇA</p><b>Excluir minha conta</b><small>Essa ação não pode ser desfeita.</small></div><button id="delete-account" type="button">Solicitar exclusão</button></div>
+  </main>
+  <script src="/associado/settings.js"></script>
+</body>
+</html>
