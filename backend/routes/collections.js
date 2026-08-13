@@ -23,6 +23,63 @@ function collection(name, req, res) {
 }
 
 async function databaseCollection(name, req, res, url) {
+  if (url.pathname === '/api/news/upload' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    const newsMediaDir = path.join(uploadsDir, 'news');
+    if (!fs.existsSync(newsMediaDir)) fs.mkdirSync(newsMediaDir, { recursive: true });
+    let savedPath = null;
+    let fileError = null;
+    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
+    busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, NEWS_MEDIA_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem (png/jpg/webp) ou vídeo (mp4/webm/mov/ogg).';
+        stream.resume();
+        return;
+      }
+      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
+      const safeName = `news_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
+      const destination = path.join(newsMediaDir, safeName);
+      stream.pipe(fs.createWriteStream(destination));
+      stream.on('limit', () => { fileError = 'O arquivo deve ter no máximo 50 MB'; });
+      savedPath = safeName;
+    });
+    busboy.on('finish', () => {
+      if (fileError) return send(res, 400, { error: fileError });
+      if (!savedPath) return send(res, 400, { error: 'Nenhum arquivo enviado' });
+      return send(res, 200, { url: `/uploads/news/${savedPath}` });
+    });
+    return req.pipe(busboy);
+  }
+
+  if (url.pathname === '/api/products/upload' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    const productPhotosDir = path.join(uploadsDir, 'products');
+    if (!fs.existsSync(productPhotosDir)) fs.mkdirSync(productPhotosDir, { recursive: true });
+    let savedPath = null;
+    let fileError = null;
+    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+    busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, IMAGE_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem png, jpg ou webp.';
+        stream.resume();
+        return;
+      }
+      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
+      const safeName = `product_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
+      const destination = path.join(productPhotosDir, safeName);
+      stream.pipe(fs.createWriteStream(destination));
+      stream.on('limit', () => { fileError = 'A imagem deve ter no máximo 10 MB'; });
+      savedPath = safeName;
+    });
+    busboy.on('finish', () => {
+      if (fileError) return send(res, 400, { error: fileError });
+      if (!savedPath) return send(res, 400, { error: 'Nenhuma imagem enviada' });
+      return send(res, 200, { url: `/uploads/products/${savedPath}` });
+    });
+    return req.pipe(busboy);
+  }
   if ((name === 'members' || name === 'transactions') && req.method === 'GET') {
     const session = resolveSession(bearerToken(req));
     if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
@@ -279,8 +336,11 @@ async function databaseCollection(name, req, res, url) {
     }
   }
   if (name === 'news') {
-    if (req.method === 'GET') return send(res, 200, (await prisma.news.findMany({ orderBy: { createdAt: 'desc' } })).map(item => ({ id: item.id, title: item.title, category: item.category, text: item.content, imageUrl: item.imageUrl || null, videoUrl: item.videoUrl || null, date: item.createdAt.toISOString().slice(0, 10) })));
+    if (req.method === 'GET') return send(res, 200, (await prisma.news.findMany({ where: { published: true }, orderBy: { createdAt: 'desc' } })).map(item => ({ id: item.id, title: item.title, category: item.category, text: item.content, imageUrl: item.imageUrl || null, videoUrl: item.videoUrl || null, date: item.createdAt.toISOString().slice(0, 10) })));
+    const newsSession = resolveSession(bearerToken(req));
+    if (!newsSession || !INTERNAL_ROLES.has(newsSession.role)) return send(res, 401, { error: 'Autenticação necessária' });
     if (req.method === 'POST') return body(req).then(async item => { const news = await prisma.news.create({ data: { title: item.title, category: item.category || 'Comunicado', content: item.text || item.content || '', imageUrl: item.imageUrl || null, videoUrl: item.videoUrl || null, published: item.published !== false } }); send(res, 201, { id: news.id, title: news.title, category: news.category, text: news.content, imageUrl: news.imageUrl, videoUrl: news.videoUrl, date: news.createdAt.toISOString().slice(0, 10) }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'PUT') return body(req).then(async item => { const news = await prisma.news.update({ where: { id: item.id }, data: { title: item.title, category: item.category, content: item.text || item.content, imageUrl: item.imageUrl, videoUrl: item.videoUrl } }); send(res, 200, { id: news.id, title: news.title, category: news.category, text: news.content, imageUrl: news.imageUrl, videoUrl: news.videoUrl, date: news.createdAt.toISOString().slice(0, 10) }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.news.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
   }
   if (name === 'athletes') {
@@ -470,65 +530,6 @@ async function databaseCollection(name, req, res, url) {
       return body(req).then(async item => { await prisma.sponsor.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     }
   }
-    const productPhotosDir = path.join(uploadsDir, 'products');
-    if (!fs.existsSync(productPhotosDir)) fs.mkdirSync(productPhotosDir, { recursive: true });
-    const newsMediaDir = path.join(uploadsDir, 'news');
-    if (!fs.existsSync(newsMediaDir)) fs.mkdirSync(newsMediaDir, { recursive: true });
-
-  if (url.pathname === '/api/news/upload' && req.method === 'POST') {
-    const session = resolveSession(bearerToken(req));
-    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
-    let savedPath = null;
-    let fileError = null;
-    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
-    busboy.on('file', (name, stream, info) => {
-      if (!isAllowedMime(info.mimeType, NEWS_MEDIA_MIME_TYPES)) {
-        fileError = 'Tipo de arquivo não permitido. Envie uma imagem (png/jpg/webp) ou vídeo (mp4/webm/mov/ogg).';
-        stream.resume();
-        return;
-      }
-      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
-      const safeName = `news_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
-      const destination = path.join(newsMediaDir, safeName);
-      stream.pipe(fs.createWriteStream(destination));
-      stream.on('limit', () => { fileError = 'O arquivo deve ter no máximo 50 MB'; });
-      savedPath = safeName;
-    });
-    busboy.on('finish', () => {
-      if (fileError) return send(res, 400, { error: fileError });
-      if (!savedPath) return send(res, 400, { error: 'Nenhum arquivo enviado' });
-      return send(res, 200, { url: `/uploads/news/${savedPath}` });
-    });
-    return req.pipe(busboy);
-  }
-
-  if (url.pathname === '/api/products/upload' && req.method === 'POST') {
-    const session = resolveSession(bearerToken(req));
-    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
-    let savedPath = null;
-    let fileError = null;
-    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
-    busboy.on('file', (name, stream, info) => {
-      if (!isAllowedMime(info.mimeType, IMAGE_MIME_TYPES)) {
-        fileError = 'Tipo de arquivo não permitido. Envie uma imagem png, jpg ou webp.';
-        stream.resume();
-        return;
-      }
-      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
-      const safeName = `product_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
-      const destination = path.join(productPhotosDir, safeName);
-      stream.pipe(fs.createWriteStream(destination));
-      stream.on('limit', () => { fileError = 'A imagem deve ter no máximo 10 MB'; });
-      savedPath = safeName;
-    });
-    busboy.on('finish', () => {
-      if (fileError) return send(res, 400, { error: fileError });
-      if (!savedPath) return send(res, 400, { error: 'Nenhuma imagem enviada' });
-      return send(res, 200, { url: `/uploads/products/${savedPath}` });
-    });
-    return req.pipe(busboy);
-  }
-
   if (name === 'store-products') {
     const session = resolveSession(bearerToken(req));
     if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
