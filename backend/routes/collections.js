@@ -80,6 +80,34 @@ async function databaseCollection(name, req, res, url) {
     });
     return req.pipe(busboy);
   }
+  if (url.pathname === '/api/championships/upload-logo' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    const logosDir = path.join(uploadsDir, 'championships');
+    if (!fs.existsSync(logosDir)) fs.mkdirSync(logosDir, { recursive: true });
+    let savedPath = null;
+    let fileError = null;
+    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+    busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, IMAGE_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem png, jpg ou webp.';
+        stream.resume();
+        return;
+      }
+      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
+      const safeName = `opponent_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
+      const destination = path.join(logosDir, safeName);
+      stream.pipe(fs.createWriteStream(destination));
+      stream.on('limit', () => { fileError = 'A imagem deve ter no máximo 5 MB'; });
+      savedPath = safeName;
+    });
+    busboy.on('finish', () => {
+      if (fileError) return send(res, 400, { error: fileError });
+      if (!savedPath) return send(res, 400, { error: 'Nenhuma imagem enviada' });
+      return send(res, 200, { url: `/uploads/championships/${savedPath}` });
+    });
+    return req.pipe(busboy);
+  }
   if ((name === 'members' || name === 'transactions') && req.method === 'GET') {
     const session = resolveSession(bearerToken(req));
     if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
@@ -362,6 +390,34 @@ async function databaseCollection(name, req, res, url) {
       send(res, 200, { ...team, createdAt: team.createdAt.toISOString() });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.team.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+  }
+  if (name === 'championships') {
+    if (req.method === 'GET') return send(res, 200, (await prisma.championship.findMany({ orderBy: { createdAt: 'desc' }, include: { games: { orderBy: { date: 'asc' } } } })).map(c => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), games: c.games.map(g => ({ ...g, date: g.date.toISOString(), createdAt: g.createdAt.toISOString() })) })));
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    if (req.method === 'POST') return body(req).then(async item => {
+      const c = await prisma.championship.create({ data: { name: item.name, sport: item.sport, season: item.season || null, status: ['EM_ANDAMENTO', 'FINALIZADO', 'PROXIMO'].includes(item.status) ? item.status : 'EM_ANDAMENTO', placement: item.placement || null, isTitle: !!item.isTitle, notes: item.notes || null } });
+      send(res, 201, { ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), games: [] });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'PUT') return body(req).then(async item => {
+      const c = await prisma.championship.update({ where: { id: item.id }, data: { name: item.name, sport: item.sport, season: item.season || null, status: ['EM_ANDAMENTO', 'FINALIZADO', 'PROXIMO'].includes(item.status) ? item.status : 'EM_ANDAMENTO', placement: item.placement || null, isTitle: !!item.isTitle, notes: item.notes || null } });
+      send(res, 200, { ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.championship.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+  }
+  if (name === 'championship-games') {
+    if (req.method === 'GET') return send(res, 200, (await prisma.championshipGame.findMany({ orderBy: { date: 'asc' } })).map(g => ({ ...g, date: g.date.toISOString(), createdAt: g.createdAt.toISOString() })));
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    if (req.method === 'POST') return body(req).then(async item => {
+      const g = await prisma.championshipGame.create({ data: { championshipId: item.championshipId, opponentName: item.opponentName, opponentLogoUrl: item.opponentLogoUrl || null, date: new Date(item.date), location: item.location || null, status: item.status === 'REALIZADO' ? 'REALIZADO' : 'AGENDADO', ourScore: item.ourScore === '' || item.ourScore === undefined || item.ourScore === null ? null : Number(item.ourScore), opponentScore: item.opponentScore === '' || item.opponentScore === undefined || item.opponentScore === null ? null : Number(item.opponentScore), notes: item.notes || null } });
+      send(res, 201, { ...g, date: g.date.toISOString(), createdAt: g.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'PUT') return body(req).then(async item => {
+      const g = await prisma.championshipGame.update({ where: { id: item.id }, data: { opponentName: item.opponentName, opponentLogoUrl: item.opponentLogoUrl || null, date: new Date(item.date), location: item.location || null, status: item.status === 'REALIZADO' ? 'REALIZADO' : 'AGENDADO', ourScore: item.ourScore === '' || item.ourScore === undefined || item.ourScore === null ? null : Number(item.ourScore), opponentScore: item.opponentScore === '' || item.opponentScore === undefined || item.opponentScore === null ? null : Number(item.opponentScore), notes: item.notes || null } });
+      send(res, 200, { ...g, date: g.date.toISOString(), createdAt: g.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.championshipGame.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
   }
   if (name === 'member-athletes') {
     const session = resolveSession(bearerToken(req));

@@ -7,6 +7,7 @@
     { page: 'members', href: '/gestao/members.html', icon: '◎', label: 'Associados' },
     { page: 'finance', href: '/gestao/finance.html', icon: 'R$', label: 'Financeiro' },
     { page: 'sports', href: '/gestao/sports.html', icon: '⌁', label: 'Esportes' },
+    { page: 'campeonatos', href: '/gestao/campeonatos.html', icon: '🏆', label: 'Campeonatos' },
     { page: 'events', href: '/gestao/event-manager.html', icon: '◷', label: 'Eventos' },
     { page: 'sponsors', href: '/gestao/sponsors.html', icon: '◈', label: 'Patrocinadores' },
     { page: 'beneficios-gestao', href: '/gestao/beneficios-gestao.html', icon: '◇', label: 'Benefícios' },

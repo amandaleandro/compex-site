@@ -1,8 +1,0 @@
-.quick-grid>a{display:grid!important;grid-template-columns:70px minmax(0,1fr)!important;grid-template-rows:auto auto auto!important;align-items:center!important;column-gap:16px!important;row-gap:4px!important;padding:20px!important;background:#fff!important;color:#10244b!important;border:1px solid #dbe4f0!important;border-radius:12px!important;text-decoration:none!important}
-.quick-grid>a .icon{grid-column:1;grid-row:1 / span 3!important;width:70px!important;height:70px!important;margin:0!important;border-radius:15px!important;color:#fff!important}
-.quick-grid>a b{grid-column:2;grid-row:1!important;align-self:end!important;color:#10244b!important;font-size:17px!important;line-height:1.1!important;font-weight:800!important}
-.quick-grid>a small{grid-column:2;grid-row:2!important;color:#718096!important;font-size:12px!important;line-height:1.25!important;margin:0!important}
-.quick-grid>a strong{grid-column:2;grid-row:3!important;color:#155bea!important;font-size:12px!important;line-height:1.1!important;margin:4px 0 0!important;font-weight:800!important;white-space:nowrap!important}
-.quick-grid>a:hover{border-color:#9bb8e8!important;background:#fff!important;transform:translateY(-1px)}
-.quick-grid>a .icon.blue{background:#061a3d!important}.quick-grid>a .icon.navy{background:#061a3d!important}.quick-grid>a .icon.green{background:#1d479e!important}
-@media(max-width:500px){.quick-grid>a{grid-template-columns:56px minmax(0,1fr)!important;padding:16px!important}.quick-grid>a .icon{width:56px!important;height:56px!important}.quick-grid>a b{font-size:15px!important}}

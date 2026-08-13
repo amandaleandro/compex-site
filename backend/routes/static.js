@@ -34,7 +34,7 @@ function servePage(req, res, url) {
   const contentType = mime[path.extname(file)] || 'application/octet-stream';
   if (contentType.startsWith('text/html')) {
     const pageName = path.basename(file);
-    const internalPages = new Set(['dashboard.html','portal.html','event-manager.html','finance.html','members.html','sports.html','documents.html','permissions.html','warnings.html','communication.html','tasks.html','sponsors.html','checkin.html','produtos.html','patrimonio.html','associar-se.html','beneficios-gestao.html']);
+    const internalPages = new Set(['dashboard.html','portal.html','event-manager.html','finance.html','members.html','sports.html','documents.html','permissions.html','warnings.html','communication.html','tasks.html','sponsors.html','checkin.html','produtos.html','patrimonio.html','associar-se.html','beneficios-gestao.html','campeonatos.html']);
     if (internalPages.has(pageName)) {
       const session = resolveSession(parseCookies(req).compex_role);
       if (!session || !INTERNAL_ROLES.has(session.role)) { res.writeHead(302, { Location: '/public/gestao-login.html' }); return res.end(); }
@@ -52,24 +52,24 @@ function servePage(req, res, url) {
     const publicHeaderActions = new Set(['index.html','events-public.html','sports-public.html','beneficios.html']).has(pageName) ? '<link rel="stylesheet" href="/public/public-header-actions.css">' : '';
     const loginHeaderWhite = pageName === 'login.html' ? '<link rel="stylesheet" href="/public/login-header-white.css"><link rel="stylesheet" href="/public/login-structure-fix.css"><link rel="stylesheet" href="/public/login-security-removal.css">' : '';
     const signupHeaderWhite = pageName === 'associate-signup.html' ? '<link rel="stylesheet" href="/public/signup-header-white.css">' : '';
-    const associatePortalContrast = pageName === 'portal-associado.html' ? '<link rel="stylesheet" href="/associado/associate-portal-contrast.css"><link rel="stylesheet" href="/associado/associate-quick-fix.css">' : '';
-    const notificationsFix = pageName === 'notificacoes.html' ? '<link rel="stylesheet" href="/associado/notifications-fix.css">' : '';
     const eventsVivid = pageName === 'events-public.html' ? '<link rel="stylesheet" href="/public/events-vivid.css">' : '';
     const sportsPublicFix = pageName === 'sports-public.html' ? '<link rel="stylesheet" href="/public/sports-public-fix.css"><link rel="stylesheet" href="/public/sports-public-agenda.css"><link rel="stylesheet" href="/public/sports-equipment.css">' : '';
     const sportsEquipmentScript = pageName === 'sports-public.html' ? '<script src="/public/sports-equipment.js"></script>' : '';
     const benefitsPublicFix = pageName === 'beneficios.html' ? '<link rel="stylesheet" href="/public/benefits-public-fix.css"><link rel="stylesheet" href="/public/benefits-access.css"><link rel="stylesheet" href="/public/benefits-header-final.css">' : '';
-    const associatePages = new Set(['portal-associado.html','agenda.html','carteirinha.html','events-public.html','beneficios.html','notificacoes.html','configuracoes.html','mensalidade.html','modalidade.html','loja.html','indicar.html','cobrancas.html','convocacoes.html']);
-    const associateNav = associatePages.has(pageName) ? '<script src="/associado/associate-nav.js"></script>' : '';
+    const associatePages = new Set(['portal-associado.html','agenda.html','carteirinha.html','events-public.html','beneficios.html','beneficios-associado.html','notificacoes.html','configuracoes.html','mensalidade.html','modalidade.html','loja.html','indicar.html','cobrancas.html','convocacoes.html']);
+    const associateNav = associatePages.has(pageName) ? '<script src="/associado/associate-nav.js?v=2"></script>' : '';
     const associateProfile = associatePages.has(pageName) ? '<script src="/associado/associate-profile.js"></script>' : '';
     const birthdayCelebration = associatePages.has(pageName) ? '<link rel="stylesheet" href="/associado/birthday-celebration.css"><script src="/associado/birthday-celebration.js"></script>' : '';
     const associateEventsFix = associatePages.has(pageName) ? '<script src="/associado/associate-events-fix.js"></script>' : '';
     const associateEventsScript = pageName === 'agenda.html' ? '<script src="/associado/associate-events.js"></script>' : '';
+    const associatePortalLineFix = associatePages.has(pageName) ? '<link rel="stylesheet" href="/associado/portal-line-fix.css?v=5">' : '';
     const adminShellScript = internalPages.has(pageName) ? '<script src="/shared/admin-shell.js"></script>' : '';
     // Páginas internas (gestão) têm design system próprio (admin.css) e não usam a
     // pilha de patches !important do site público/associado (theme.css/navigation-fix.css/brand-assets.css).
+    const responsiveCss = '<link rel="stylesheet" href="/shared/responsive.css">';
     const legacyGlobalCss = internalPages.has(pageName) ? '' : '<link rel="stylesheet" href="/shared/theme.css"><link rel="stylesheet" href="/shared/navigation-fix.css">';
     const legacyBrandCss = internalPages.has(pageName) ? '' : '<link rel="stylesheet" href="/shared/brand-assets.css">';
-    let pageMarkup = contents.toString().replace('</head>', `${legacyGlobalCss}${homeReference}${eventsVivid}${sportsPublicFix}${benefitsPublicFix}${publicHeaderActions}${loginHeaderWhite}${signupHeaderWhite}${associatePortalContrast}${notificationsFix}${adminLink}${birthdayCelebration}${legacyBrandCss}</head>`).replace('</header>', `${publicJoin}</header>`).replace('</body>', `${sportsEquipmentScript}${associateNav}${associateProfile}${associateEventsFix}${associateEventsScript}${adminShellScript}<script src="/shared/api-bridge.js"></script></body>`);
+    let pageMarkup = contents.toString().replace('</head>', `${responsiveCss}${legacyGlobalCss}${homeReference}${eventsVivid}${sportsPublicFix}${benefitsPublicFix}${publicHeaderActions}${loginHeaderWhite}${signupHeaderWhite}${adminLink}${birthdayCelebration}${legacyBrandCss}${associatePortalLineFix}</head>`).replace('</header>', `${publicJoin}</header>`).replace('</body>', `${sportsEquipmentScript}${associateNav}${associateProfile}${associateEventsFix}${associateEventsScript}${adminShellScript}<script src="/shared/api-bridge.js"></script></body>`);
     contents = Buffer.from(pageMarkup);
   }
   send(res, 200, contents, contentType);

@@ -1,0 +1,18 @@
+body:has(.welcome) {
+  background: #fff !important;
+}
+
+header:not(.site-header).member-topbar nav a.active {
+  border-bottom: 0 !important;
+  position: relative !important;
+}
+
+.member-topbar nav a.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #155bea;
+}

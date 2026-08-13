@@ -1,8 +1,45 @@
+# Dependências
 node_modules/
+
+# Variáveis de ambiente e segredos
 .env
+.env.*
+!.env.example
+
+# Saídas geradas pelo Prisma
 backend/generated/
+
+# Dados e arquivos locais da aplicação
 backend/sessions.json
 backend/server.log
 backend/data.json
 backend/uploads/
+
+# Logs e arquivos de debug
+*.log
+logs/
+test-results/
+playwright-report/
+
+# Cobertura e mapas de código
+coverage/
 frontend/**/*.map
+
+# Builds e pacotes gerados
+dist/
+build/
+*.tgz
+*.zip
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.bak

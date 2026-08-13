@@ -2,6 +2,15 @@
 document.querySelectorAll('a[href="/gestao/portal.html"]').forEach(link => { link.href = 'associate-portal.html'; });
 if (document.querySelector('.member-topbar')) document.querySelectorAll('a[href="/public/beneficios.html"]').forEach(link => { link.href = '/associado/beneficios-associado.html'; });
 
+const associateMenu = document.querySelector('.member-topbar nav');
+if (associateMenu && !associateMenu.querySelector('a[href="/associado/carteirinha.html"]')) {
+  const cardLink = document.createElement('a');
+  cardLink.href = '/associado/carteirinha.html';
+  cardLink.textContent = 'Carteirinha';
+  const benefitsLink = associateMenu.querySelector('a[href="/associado/beneficios-associado.html"], a[href="/public/beneficios.html"]');
+  associateMenu.insertBefore(cardLink, benefitsLink || null);
+}
+
 // Atletas avulsos (sem mensalidade de sócio) ganham um link extra pras cobranças PIX por treino/jogo.
 (async function () {
   const nav = document.querySelector('.member-topbar nav');

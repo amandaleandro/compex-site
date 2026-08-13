@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Campeonatos — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div id="admin-shell" data-active="campeonatos"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Campeonatos</p><h1>Campeonatos & Resultados</h1><p>Cadastro de campeonatos, colocações, títulos e jogos por modalidade.</p></div>
+    <button id="new-championship" class="btn btn-primary">+ Novo campeonato</button>
+  </header>
+
+  <section class="grid grid-3" style="margin-bottom:18px">
+    <article class="metric-card"><p>Campeonatos</p><strong id="metric-total">--</strong></article>
+    <article class="metric-card"><p>Títulos conquistados</p><strong id="metric-titles">--</strong></article>
+    <article class="metric-card"><p>Em andamento</p><strong id="metric-active">--</strong></article>
+  </section>
+
+  <section class="card">
+    <div class="toolbar"><input type="search" id="search" placeholder="Buscar por campeonato ou modalidade…"></div>
+    <div id="list"></div>
+  </section>
+</main>
+
+<!-- MODAL: CAMPEONATO -->
+<div class="modal-backdrop" id="modal">
+  <form class="modal" id="form">
+    <h2 id="modal-title">Novo campeonato</h2>
+    <input type="hidden" id="championship-id">
+    <div class="field"><label>Nome do campeonato</label><input id="name" required placeholder="Ex: Intercomp 2026"></div>
+    <div class="field-row">
+      <div class="field"><label>Modalidade</label><input id="sport" required placeholder="Ex: Vôlei"></div>
+      <div class="field"><label>Temporada</label><input id="season" placeholder="Ex: 2026"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Situação</label>
+        <select id="status">
+          <option value="PROXIMO">Próximo</option>
+          <option value="EM_ANDAMENTO" selected>Em andamento</option>
+          <option value="FINALIZADO">Finalizado</option>
+        </select>
+      </div>
+      <div class="field"><label>Colocação final</label><input id="placement" placeholder="Ex: 1º lugar, Campeão, Semifinal"></div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="isTitle" style="width:auto;margin-right:6px">Conquistou título neste campeonato</label></div>
+    <div class="field"><label>Notas</label><textarea id="notes" rows="2" placeholder="Observações sobre a campanha..."></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Salvar campeonato</button>
+    </div>
+  </form>
+</div>
+
+<!-- MODAL: JOGO -->
+<div class="modal-backdrop" id="game-modal">
+  <form class="modal" id="game-form">
+    <h2 id="game-modal-title">Novo jogo</h2>
+    <input type="hidden" id="game-id">
+    <input type="hidden" id="game-championship-id">
+    <div class="field"><label>Adversário</label><input id="opponentName" required placeholder="Ex: Atlética Fúria"></div>
+    <div class="field">
+      <label>Logo do adversário</label>
+      <input type="file" id="opponentLogoFile" accept="image/*">
+      <input type="hidden" id="opponentLogoUrl">
+      <div id="opponent-logo-preview" style="margin-top:8px"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Data</label><input id="game-date" type="date" required></div>
+      <div class="field"><label>Local</label><input id="game-location" placeholder="Ex: Ginásio da UFU"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Status</label>
+        <select id="game-status">
+          <option value="AGENDADO">Agendado</option>
+          <option value="REALIZADO">Realizado</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Placar COMPEX</label><input id="ourScore" type="number" min="0" placeholder="—"></div>
+      <div class="field"><label>Placar adversário</label><input id="opponentScore" type="number" min="0" placeholder="—"></div>
+    </div>
+    <div class="field"><label>Notas</label><textarea id="game-notes" rows="2" placeholder="Observações sobre a partida..."></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="game-close">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Salvar jogo</button>
+    </div>
+  </form>
+</div>
+
+<script src="campeonatos.js"></script>
+</body>
+</html>

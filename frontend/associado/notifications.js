@@ -1,11 +1,49 @@
-const staticNotifications = [
-  { icon: '◷', title: 'Intercomp 2026 está chegando', text: 'Confira as informações do evento e acesse o BoraFest para participar.', time: 'Hoje', type: 'Eventos', unread: true },
-  { icon: '⚽', title: 'Treino de futsal hoje', text: 'O treino acontece às 19h30 na Quadra 2. Não esqueça sua carteirinha.', time: 'Há 2 horas', type: 'Esportes', unread: true },
-  { icon: '✦', title: 'Novo benefício disponível', text: 'Você ganhou 15% de desconto na Arena Sport. Aproveite seu código.', time: 'Ontem', type: 'Benefícios', unread: false }
-];
+const toDate = (date) => date ? new Date(date.includes('T') ? date : `${date}T12:00:00`) : null;
 
 const list = document.querySelector('#list');
-let allNotifications = [...staticNotifications];
+let allNotifications = [];
+
+async function loadEventNotifications() {
+  try {
+    const res = await fetch('/api/events');
+    if (!res.ok) return;
+    const events = await res.json();
+    const now = Date.now();
+    events
+      .filter(e => e.published !== false)
+      .filter(e => { const d = toDate(e.date); return d && !isNaN(d) && d.getTime() >= now; })
+      .sort((a, b) => toDate(a.date) - toDate(b.date))
+      .slice(0, 3)
+      .forEach(e => {
+        allNotifications.push({
+          icon: e.type === 'Treino' ? '⚽' : '◷',
+          title: e.name,
+          text: `${e.location || 'Local a definir'}${e.time ? ' · ' + e.time : ''}`,
+          time: toDate(e.date).toLocaleDateString('pt-BR'),
+          type: 'Eventos',
+          unread: false
+        });
+      });
+  } catch {}
+}
+
+async function loadBenefitNotifications() {
+  try {
+    const res = await fetch('/api/benefits');
+    if (!res.ok) return;
+    const benefits = await res.json();
+    benefits.slice(0, 2).forEach(b => {
+      allNotifications.push({
+        icon: b.icon || '✦',
+        title: `Benefício disponível: ${b.name}`,
+        text: b.description || 'Confira as condições na página de benefícios.',
+        time: 'Disponível',
+        type: 'Benefícios',
+        unread: false
+      });
+    });
+  } catch {}
+}
 
 async function loadOrdersNotifications() {
   const token = sessionStorage.getItem('compex-token');
@@ -66,4 +104,4 @@ document.querySelector('#read-all').addEventListener('click', () => {
   document.querySelector('#read-all').textContent = 'Tudo lido ✓';
 });
 
-loadOrdersNotifications();
+Promise.all([loadEventNotifications(), loadBenefitNotifications()]).then(() => loadOrdersNotifications());

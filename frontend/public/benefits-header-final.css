@@ -1,0 +1,8 @@
+/* Ajustes de acessibilidade e estados interativos da página de benefícios. */
+a:focus-visible,button:focus-visible{outline:3px solid #3b80ff!important;outline-offset:2px!important;border-radius:4px}
+.benefit p{color:#5b6b82!important}
+.benefit{transition:transform .18s,box-shadow .18s,border-color .18s}
+.benefit:hover{border-color:#a9c0e6!important;box-shadow:0 6px 18px #173a7114!important;transform:translateY(-2px)}
+.use:hover{background:#0d2e63!important}
+.filters button:not(.active):hover{border-color:#155bea!important;color:#155bea!important}
+#close:hover{color:#155bea!important}

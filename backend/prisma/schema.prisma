@@ -518,3 +518,43 @@ model SocialSubmission {
   reviewedBy String?
   createdAt  DateTime               @default(now())
 }
+
+enum ChampionshipStatus {
+  EM_ANDAMENTO
+  FINALIZADO
+  PROXIMO
+}
+
+model Championship {
+  id         String              @id @default(cuid())
+  name       String
+  sport      String
+  season     String?
+  status     ChampionshipStatus  @default(EM_ANDAMENTO)
+  placement  String?
+  isTitle    Boolean             @default(false)
+  notes      String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  games      ChampionshipGame[]
+}
+
+enum ChampionshipGameStatus {
+  AGENDADO
+  REALIZADO
+}
+
+model ChampionshipGame {
+  id              String                  @id @default(cuid())
+  championship    Championship            @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  championshipId  String
+  opponentName    String
+  opponentLogoUrl String?
+  date            DateTime
+  location        String?
+  status          ChampionshipGameStatus  @default(AGENDADO)
+  ourScore        Int?
+  opponentScore   Int?
+  notes           String?
+  createdAt       DateTime                @default(now())
+}

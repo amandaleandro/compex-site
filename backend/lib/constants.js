@@ -37,7 +37,8 @@ const PAGE_ROLES = {
   'produtos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),
   'pedidos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),
   'patrimonio.html': new Set(['PRESIDENCIA', 'PATRIMONIO']),
-  'beneficios-gestao.html': new Set(['PRESIDENCIA', 'MARKETING', 'FINANCEIRO'])
+  'beneficios-gestao.html': new Set(['PRESIDENCIA', 'MARKETING', 'FINANCEIRO']),
+  'campeonatos.html': new Set(['PRESIDENCIA', 'ESPORTES'])
 };
 
 module.exports = {

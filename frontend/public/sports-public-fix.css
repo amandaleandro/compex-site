@@ -1,1 +1,12 @@
 .sports-grid article>span{display:none!important}
+a:focus-visible,button:focus-visible{outline:3px solid #337cff!important;outline-offset:2px!important;border-radius:4px}
+.sports-grid article:not(.featured):hover{border-color:#a9c0e6!important;box-shadow:0 6px 18px #173a7114!important;transform:translateY(-2px);transition:transform .18s,box-shadow .18s,border-color .18s}
+.agenda-head a:hover{background:#edf3ff!important;border-color:#155bea!important;color:#155bea!important}
+.game{color:inherit!important;text-decoration:none!important;cursor:pointer}
+.empty-note{grid-column:1/-1;background:#fff;border:1px dashed #bfccdf;border-radius:10px;padding:30px;text-align:center;color:#5b6b82;font-size:12px}
+.game:hover{background:#f7faff!important}
+.sports-grid p,.game div>span{color:#5b6b82!important}
+
+.sports-grid article{transition:box-shadow .18s ease,transform .18s ease!important}
+.sports-grid article:hover{box-shadow:0 8px 20px #102c6818!important;transform:translateY(-2px)!important}
+@media(max-width:480px){.sports-grid{grid-template-columns:1fr!important}}

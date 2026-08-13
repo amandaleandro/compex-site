@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: compex-preview-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: compex
+      POSTGRES_PASSWORD: compex_preview_password
+      POSTGRES_DB: compex
+    volumes:
+      - compex_preview_db:/var/lib/postgresql/data
+
+  app:
+    image: node:22-alpine
+    container_name: compex-preview-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    working_dir: /app
+    environment:
+      PORT: 3100
+      DATABASE_URL: postgresql://compex:compex_preview_password@db:5432/compex?schema=public
+      PUBLIC_BASE_URL: http://191.252.208.234:3101
+    volumes:
+      - ./:/app
+    ports:
+      - "0.0.0.0:3101:3100"
+    command: >-
+      sh -c "npm ci && npm run db:generate && npx prisma db push --config backend/prisma.config.ts --accept-data-loss;
+      npm run db:seed || true; npm start"
+
+volumes:
+  compex_preview_db:

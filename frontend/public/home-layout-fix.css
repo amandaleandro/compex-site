@@ -1,1 +1,11 @@
 .hero{height:430px!important;min-height:430px!important;overflow:hidden!important}.hero-copy{padding-top:48px!important;padding-bottom:42px!important}.hero-actions{position:relative;z-index:5;margin-bottom:4px!important}.hero-actions a{position:relative;z-index:6;display:inline-flex!important;align-items:center!important;justify-content:center!important}.site-header nav a[href="/gestao/members.html"],.site-header nav a[href="/gestao/finance.html"]{display:none!important}.site-header .member-button{background:#0b255b!important;color:#fff!important}.site-header .member-button *{color:#fff!important}.hero-actions .primary{background:#2367e8!important;border-color:#2367e8!important;color:#fff!important}.hero-actions .primary *{color:#fff!important}.hero-actions .secondary{background:transparent!important;color:#fff!important;border-color:#a7b8d3!important}.hero-actions .primary:hover,.site-header .member-button:hover{color:#fff!important}@media(max-width:800px){.hero{height:auto!important;min-height:0!important}.hero-copy{padding-bottom:28px!important}.hero-actions{margin-bottom:0!important}}
+a:focus-visible,button:focus-visible{outline:3px solid #4c8bff!important;outline-offset:2px!important;border-radius:4px}
+.hero-actions .primary:hover{background:#1c53c9!important}
+.hero-actions .secondary:hover{background:#ffffff1a!important;border-color:#c7d5ea!important}
+.box-head>a:hover,.partners-more:hover{background:#e8eefb!important;border-color:#1e40af!important}
+.event-mini span,.event-mini div>small,.news-row p,.result-list small{color:#5b6b82!important}
+.stat-row{grid-template-columns:repeat(3,1fr)!important}
+@media(max-width:520px){.stat-row{grid-template-columns:1fr!important}}
+#highlight-link{text-decoration:none;color:inherit}
+.empty-events{color:#5b6b82;font-size:12px;grid-column:1/-1}
+
