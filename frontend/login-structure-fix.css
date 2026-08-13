@@ -1,0 +1,4 @@
+body .login-header.site-header{background:#fff!important;color:#11254b!important;height:102px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;padding:0 4.5vw!important;border-bottom:1px solid #dce4ef!important}
+body .login-header.site-header .brand{display:block!important;min-width:0!important;background:transparent!important;color:#11254b!important;padding:0!important}
+body .login-header.site-header .header-actions{display:flex!important;align-items:center!important;gap:28px!important}
+body .login-header.site-header .header-actions a{background:#fff!important;color:#11254b!important;border-color:#cbd7e8!important;text-decoration:none!important}

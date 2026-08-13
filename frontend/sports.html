@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Esportes — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="sports"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Esportes</p><h1>Atletas &amp; modalidades</h1><p>Modalidades masculinas e femininas, treinos, jogos e atletas.</p></div>
+    <button id="open-athlete" class="btn btn-primary">+ Novo atleta</button>
+  </header>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="panel-head"><div><h2>Modalidades</h2><span class="muted" id="modality-count"></span></div><button type="button" id="new-modality" class="btn btn-ghost btn-sm">+ Nova modalidade</button></div>
+    <div id="modality-list"></div>
+  </section>
+
+  <section class="card" style="margin-bottom:18px">
+    <div class="panel-head"><div><h2>Técnicos</h2><span class="muted" id="coach-count"></span></div><button type="button" id="new-coach" class="btn btn-ghost btn-sm">+ Novo técnico</button></div>
+    <div id="coach-list"></div>
+  </section>
+
+  <section class="card">
+    <div class="panel-head"><h2>Atletas cadastrados</h2><span class="muted" id="athlete-count"></span></div>
+    <div id="athlete-list"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="coach-modal">
+  <form class="modal" id="coach-form">
+    <h2 id="coach-modal-title">Novo técnico</h2>
+    <input type="hidden" id="coach-id">
+    <div class="field"><label>Nome</label><input id="coach-name" required></div>
+    <div class="field"><label>Modalidade</label><select id="coach-team"><option value="">Sem modalidade vinculada</option></select></div>
+    <div class="field-row">
+      <div class="field"><label>Valor da hora de treino (R$)</label><input id="coach-hourly-rate" type="number" step="0.01" min="0" required></div>
+      <div class="field"><label>Chave PIX</label><input id="coach-pix" placeholder="e-mail, telefone ou CPF"></div>
+    </div>
+    <div class="field"><label>Observações</label><input id="coach-notes"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close-coach">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="coach-submit">Cadastrar</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-backdrop" id="athlete-modal">
+  <form class="modal" id="athlete-form">
+    <h2 id="athlete-modal-title">Novo atleta</h2>
+    <input type="hidden" id="athlete-id">
+    <div class="field"><label>Nome</label><input id="athlete-name" required></div>
+    <div class="field"><label>Curso</label><input id="athlete-course" required></div>
+    <div class="field-row">
+      <div class="field"><label>Modalidade</label><select id="athlete-sport" required></select></div>
+      <div class="field"><label>Posição</label><input id="athlete-position" required></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close-athlete">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="athlete-submit">Cadastrar</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-backdrop" id="modality-modal">
+  <form class="modal" id="modality-form">
+    <h2 id="modality-modal-title">Nova modalidade</h2>
+    <input type="hidden" id="modality-id">
+    <div class="field"><label>Nome</label><input id="modality-name" placeholder="ex.: Futsal Feminino" required></div>
+    <div class="field-row">
+      <div class="field"><label>Esporte</label><input id="modality-sport" placeholder="Futsal" required></div>
+      <div class="field"><label>Gênero</label>
+        <select id="modality-gender"><option value="MASCULINO">Masculina</option><option value="FEMININO">Feminina</option><option value="MISTA">Mista</option></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Dia de treino</label><input id="modality-training-day" placeholder="ex.: Terças e quintas"></div>
+      <div class="field"><label>Valor por treino/jogo (avulsos)</label><input id="modality-drop-in-price" type="number" step="0.01" min="0" placeholder="ex.: 15.00"></div>
+    </div>
+    <div class="field"><label>Descrição</label><textarea id="modality-description" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close-modality">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="modality-submit">Cadastrar</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-backdrop" id="team-athletes-modal">
+  <div class="modal" style="width:min(94vw,600px)">
+    <h2 id="team-athletes-title">Atletas da modalidade</h2>
+    <p class="modal-sub">Vincule sócios já cadastrados. Cada sócio tem um número de vagas de esporte; vôlei ocupa 2 vagas.</p>
+    <div class="field">
+      <label>Buscar sócio por nome ou curso</label>
+      <input type="search" id="member-search" placeholder="Digite para buscar…">
+    </div>
+    <div id="member-search-results" style="max-height:220px;overflow-y:auto;margin-bottom:14px"></div>
+    <hr class="hairline">
+    <p class="rank-heading">Vinculados a esta modalidade</p>
+    <div id="team-athletes-list"></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" id="close-team-athletes">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="sessions-modal">
+  <div class="modal" style="width:min(94vw,560px)">
+    <h2 id="sessions-modal-title">Treinos &amp; jogos</h2>
+    <p class="modal-sub">Custo total com treinador registrado: <strong id="sessions-total-cost">R$ 0,00</strong></p>
+    <form id="session-form" style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0;margin-bottom:14px">
+      <input type="hidden" id="session-id">
+      <div class="field-row">
+        <div class="field"><label>Tipo</label><select id="session-type"><option value="TREINO">Treino</option><option value="JOGO">Jogo</option></select></div>
+        <div class="field"><label>Data</label><input id="session-date" type="date" required></div>
+      </div>
+      <div class="field"><label>Local</label><input id="session-location"></div>
+      <div class="field-row">
+        <div class="field"><label>Treinador</label><select id="session-coach"><option value="">Sem treinador cadastrado</option></select></div>
+        <div class="field"><label>Custo do treinador (R$)</label><input id="session-cost" type="number" step="0.01" min="0"></div>
+      </div>
+      <p class="muted" id="coach-pix-hint" style="margin:-8px 0 12px;font-size:11px"></p>
+      <div id="referee-fields" hidden>
+        <div class="field-row">
+          <div class="field"><label>Juiz</label><input id="session-referee-name" placeholder="Nome do juiz"></div>
+          <div class="field"><label>Chave PIX do juiz</label><input id="session-referee-pix" placeholder="e-mail, telefone ou CPF"></div>
+        </div>
+        <div class="field"><label>Custo do juiz (R$)</label><input id="session-referee-cost" type="number" step="0.01" min="0"></div>
+        <p class="muted" style="margin:-8px 0 12px;font-size:11px">Dividido entre todos os vinculados à modalidade — sócio paga só a parte do juiz, avulso paga a parte do juiz + o valor do jogo.</p>
+      </div>
+      <div class="field"><label>Observações</label><input id="session-notes"></div>
+      <button class="btn btn-primary btn-sm" type="submit" id="session-submit">Registrar</button>
+    </form>
+    <div id="sessions-list" style="max-height:260px;overflow-y:auto"></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" id="close-sessions">Fechar</button></div>
+  </div>
+</div>
+<script src="sports.js"></script>
+</body>
+</html>

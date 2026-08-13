@@ -1,0 +1,32 @@
+/* Identidade visual CompExatas — tema global */
+:root{--ink:#081220;--navy:#081220;--blue:#0d1b3d;--royal:#1e40af;--lime:#1e40af;--cream:#f5f7fa;--line:#d7dce5;--white:#fff;--muted:#6d7788}
+body{background:#f2f4f7;color:#101a2f}
+header.topbar,header:not(.site-header),.sidebar,aside{background:#081220!important;color:#fff!important}
+.brand,.brand a,header a{color:inherit}
+.brand-mark{background:#1e40af!important;color:#fff!important}
+.button-dark,.primary,.submit,.add,.light-btn,.event-link,.external-link,.download,.member-button{background:#0d1b3d!important;color:#fff!important}
+.button-lime,.button-light,.light,.status.active,.live,.tag.green,.published-date{background:#1e40af!important;color:#fff!important}
+.button-outline,.outline,.secondary{border-color:#9aa8ba!important;color:#0d1b3d!important;background:#fff!important}
+.hero,.event-hero,.benefits,.transparency,.perks,.values,.quick,.intro{background:#081220!important;color:#fff!important}
+.hero h1 em,.hero h2 em,.hero-copy h2 em,.benefit-intro em,.modal em,.title h1 em,.page-title em,.event-info em{color:#4d78e8!important}
+.ticker,.notice,.lime,.lime-bg,.sport-main,.folder.active,.module.lime,.hero .eyebrow,.intro .eyebrow{background:#1e40af!important;color:#fff!important}
+.event-card.featured,.modal,.panel,.box,.card-wrap,.status-panel,.info-box,.form-card,.preview-card,.summary article,.metrics article,.product,.news-box,.results,.scanner-card,.side,.recent,.benefit,.notification,.partner,.column,.published-event{border-color:#d7dce5!important}
+.panel,.box,.card-wrap,.status-panel,.info-box,.form-card,.summary article,.metrics article,.product,.news-box,.results,.scanner-card,.side,.recent,.benefit,.notification,.partner,.published-event,.white{background:#fff!important}
+.eyebrow,.muted,.section-note,.event-meta,.details small,.agenda-item p,.task small,.document small{color:#6d7788!important}
+.pill.active,.card-ok,.presence,.positive,.green,.live-dot{color:#1e40af!important}
+.bar i,.area-income,.line-income,.progress{background:#1e40af!important;stroke:#1e40af!important}
+.modal-backdrop,.backdrop{background:#081220dd!important}
+footer{background:#081220!important;color:#c4cfdf!important}
+@media(max-width:800px){.nav.mobile-open{background:#fff!important;color:#101a2f!important}}
+/* Ações e acessos principais com aparência de botão */
+.box-head>a,.section-head>a,.panel-head>a,.module,.quick-list a,.see-all,.read,.director,.admin-link,.back,.back-link,.light-btn,.external-link{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:6px;padding:9px 12px;background:#fff;color:#1e40af!important;border:1px solid #b7c4d8;font-size:10px;font-weight:700}
+.module,.quick-list a{justify-content:space-between;text-align:left}
+.box-head>a:hover,.section-head>a:hover,.panel-head>a:hover,.see-all:hover,.read:hover,.director:hover,.admin-link:hover,.back:hover,.module:hover,.quick-list a:hover{background:#e8eefb!important;border-color:#1e40af!important}
+.sidebar nav a,.side-label+nav a{border-radius:6px}
+.site-header nav a{border-radius:0;background:transparent;border:0;padding-top:30px;padding-bottom:30px}
+a[href$=".html"]:not(.logo):not(.brand):not(.site-header nav a):not(footer a):not(.member-button):not(.primary):not(.secondary):not(.submit):not(.join-button):not(.login-button){display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:6px;padding:9px 12px;background:#fff;color:#1e40af!important;border:1px solid #b7c4d8;font-size:10px;font-weight:700}
+a[href$=".html"]:not(.logo):not(.brand):not(.site-header nav a):not(footer a):not(.member-button):not(.primary):not(.secondary):not(.submit):not(.join-button):not(.login-button):hover{background:#e8eefb!important;border-color:#1e40af!important}
+body:has(.module-head)>main>header{background:#faf9f5!important;color:#0b1b3a!important;border:0!important;box-shadow:none!important}body:has(.module-head)>main>header h1{color:#0b1b3a!important}body:has(.module-head)>main>header .muted{color:#718096!important}body:has(.module-head) .module{background:#fffefa!important;color:#0b1b3a!important}body:has(.module-head) .module:first-child{background:#fffefa!important;color:#0b1b3a!important;border-color:#dce5f0!important}body:has(.module-head) .module:first-child b,body:has(.module-head) .module:first-child small{color:inherit!important}body:has(.module-head) .hero .light{background:transparent!important;color:#fff!important;border:1px solid #8bb6f5!important}body:has(.module-head)>aside nav a{background:transparent!important;color:#d5dfed!important}body:has(.module-head)>aside nav a.selected{background:#1769e8!important;color:#fff!important}
+body:has(.module-head) a.module,body:has(.module-head) a.module b,body:has(.module-head) a.module small{color:#0b1b3a!important}body:has(.module-head) a.light{color:#fff!important}body:has(.module-head)>aside nav a.selected{color:#fff!important}
+body:has(.module-head)>aside .brand{justify-content:flex-start!important;gap:4px!important;font-size:0!important}body:has(.module-head)>aside .brand-mark{width:178px!important;height:124px!important;background-size:178px auto!important;margin:0 auto!important}body:has(.module-head)>aside .brand:after{font-size:11px!important;color:#1680ff!important;letter-spacing:.16em!important;margin-top:-8px!important}
+body:has(.module-head)>main>header{min-height:92px!important;padding:6px 2px!important}body:has(.module-head)>main>header h1{font-size:36px!important;letter-spacing:-.065em!important;margin:8px 0!important}body:has(.module-head)>main>header .eyebrow{font-size:10px!important}body:has(.module-head) .module-head{margin-top:4px!important}

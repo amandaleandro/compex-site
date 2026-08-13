@@ -1,0 +1,497 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PRESIDENCIA
+  FINANCEIRO
+  ESPORTES
+  EVENTOS
+  MARKETING
+  PRODUTOS
+  PATRIMONIO
+  ASSOCIADO
+}
+
+enum Status {
+  ACTIVE
+  PENDING
+  EXPIRED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum Rank {
+  DIRETOR
+  COORDENADOR
+}
+
+model User {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(ASSOCIADO)
+  rank      Rank      @default(DIRETOR)
+  birthDate DateTime?
+  member    Member?
+  warnings  DirectorWarning[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum WarningType {
+  ADVERTENCIA
+  SUSPENSAO
+  DESLIGAMENTO
+}
+
+model DirectorWarning {
+  id        String      @id @default(cuid())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  type      WarningType
+  reason    String
+  createdAt DateTime    @default(now())
+}
+
+model Member {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+  course       String
+  plan         String
+  sportSlots   Int      @default(1)
+  membershipKind String @default("SOCIO")
+  status       Status   @default(PENDING)
+  registration String?  @unique
+  socialName   String?
+  nickname     String?
+  sex          String?
+  birthDate    DateTime?
+  photoUrl     String?
+  memberType   String   @default("TORCEDOR")
+  selectedSports Json?
+  shirtSize    String?
+  instagram    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mpPayerId          String?    @unique
+  mpPreapprovalId    String?    @unique
+  subscriptionStatus String?
+  currentPeriodEnd   DateTime?
+
+  referralCode String?  @unique
+  referredBy   Member?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referredById String?
+  referrals    Member[] @relation("Referrals")
+
+  teamEnrollments   TeamEnrollment[]
+  orders            Order[]
+  pointsEntries     PointsEntry[]
+  checkIns          EventCheckIn[]
+  sessionCharges    SessionCharge[]
+  sessionAttendances SessionAttendance[]
+  socialSubmissions SocialSubmission[]
+}
+
+enum Gender {
+  MASCULINO
+  FEMININO
+  MISTA
+}
+
+enum TeamSessionType {
+  TREINO
+  JOGO
+}
+
+model Team {
+  id                String           @id @default(cuid())
+  name              String
+  sport             String
+  gender            Gender           @default(MISTA)
+  description       String?
+  trainingDay       String?
+  active            Boolean          @default(true)
+  dropInPriceCents  Int?
+  createdAt         DateTime         @default(now())
+  enrollments       TeamEnrollment[]
+  sessions          TeamSession[]
+  coaches           Coach[]
+}
+
+enum EnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TeamEnrollment {
+  id        String           @id @default(cuid())
+  member    Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  team      Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  status    EnrollmentStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+
+  @@unique([memberId, teamId])
+}
+
+model TeamSession {
+  id         String          @id @default(cuid())
+  team       Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId     String
+  type       TeamSessionType
+  date       DateTime
+  location   String?
+  coachName  String?
+  coachCost  Decimal?        @db.Decimal(10, 2)
+  refereeName String?
+  refereePixKey String?
+  refereeCost Decimal?       @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime        @default(now())
+  charges    SessionCharge[]
+  attendances SessionAttendance[]
+}
+
+enum SessionChargeStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model SessionCharge {
+  id            String              @id @default(cuid())
+  session       TeamSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId     String
+  member        Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId      String
+  amountCents   Int
+  breakdown     String?
+  status        SessionChargeStatus @default(PENDING)
+  mpPaymentId   String?
+  pixQrCode     String?
+  pixQrBase64   String?
+  createdAt     DateTime            @default(now())
+}
+
+enum AttendanceStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+model SessionAttendance {
+  id        String           @id @default(cuid())
+  session   TeamSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  member    Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  status    AttendanceStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  respondedAt DateTime?
+
+  @@unique([sessionId, memberId])
+}
+
+enum ProductType {
+  PRONTA_ENTREGA
+  ENCOMENDA
+}
+
+model Product {
+  id                 String      @id @default(cuid())
+  name               String
+  description        String?
+  imageUrl           String?
+  priceCents         Int
+  category           String
+  stock              Int         @default(0)
+  type               ProductType @default(PRONTA_ENTREGA)
+  allowSize          Boolean     @default(false)
+  allowCustomization Boolean     @default(false)
+  active             Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  orderItems         OrderItem[]
+}
+
+enum AssetCondition {
+  OTIMO
+  BOM
+  REGULAR
+  RUIM
+}
+
+enum LoanStatus {
+  EMPRESTADO
+  DEVOLVIDO
+  ATRASADO
+}
+
+model AssetLoan {
+  id               String     @id @default(cuid())
+  asset            Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assetId          String
+  borrowerName     String
+  borrowerDocument String?
+  borrowerPhone    String?
+  quantity         Int        @default(1)
+  loanDate         DateTime   @default(now())
+  expectedReturn   DateTime?
+  returnDate       DateTime?
+  status           LoanStatus @default(EMPRESTADO)
+  signatureData    String?    // Guarda a assinatura digital em Base64 PNG ou Hash do aceite
+  acceptedTerms    Boolean    @default(true)
+  termDocumentUrl  String?    // Caminho do comprovante/PDF/JSON em uploads/patrimonio
+  notes            String?
+  createdAt        DateTime   @default(now())
+}
+
+model Asset {
+  id        String         @id @default(cuid())
+  name      String
+  category  String
+  quantity  Int            @default(1)
+  condition AssetCondition @default(BOM)
+  sport     String?
+  gender    Gender?
+  location  String?
+  notes     String?
+  loans     AssetLoan[]
+  createdAt DateTime       @default(now())
+}
+
+model Coach {
+  id               String   @id @default(cuid())
+  name             String
+  hourlyRateCents  Int
+  pixKey           String?
+  notes            String?
+  team             Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamId           String?
+  createdAt        DateTime @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  READY_FOR_PICKUP
+  DELIVERED
+  CANCELED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  member          Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId        String
+  status          OrderStatus @default(PENDING)
+  totalCents      Int
+  estimatedDelivery DateTime?
+  notifiedAt      DateTime?
+  deliveredAt     DateTime?
+  deliveredBy     String?
+  mpPreferenceId  String?     @unique
+  mpPaymentId     String?
+  createdAt       DateTime    @default(now())
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id                  String  @id @default(cuid())
+  order               Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId             String
+  product             Product @relation(fields: [productId], references: [id])
+  productId           String
+  quantity            Int
+  unitPriceCents      Int
+  size                String?
+  customizationName   String?
+  customizationNumber String?
+}
+
+model Event {
+  id                String   @id @default(cuid())
+  name              String
+  type              String
+  date              DateTime
+  time              String?
+  location          String?
+  description       String?
+  platform          String   @default("BORAFEST")
+  ticketUrl         String?
+  boraFestUrl       String?
+  published         Boolean  @default(false)
+  isOwnOrganization Boolean  @default(true)
+  revenue           Decimal? @default(0.00) @db.Decimal(12, 2)
+  expenses          Decimal? @default(0.00) @db.Decimal(12, 2)
+  financialNotes    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  checkIns EventCheckIn[]
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  description String
+  amount      Decimal         @db.Decimal(12, 2)
+  type        TransactionType
+  category    String
+  createdAt   DateTime        @default(now())
+}
+
+model News {
+  id        String   @id @default(cuid())
+  title     String
+  category  String
+  content   String
+  imageUrl  String?
+  videoUrl  String?
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Athlete {
+  id         String   @id @default(cuid())
+  name       String
+  course     String
+  sport      String
+  position   String
+  attendance Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  url       String
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Poll {
+  id          String     @id @default(cuid())
+  question    String
+  options     Json
+  closed      Boolean    @default(false)
+  expiresAt   DateTime?
+  createdBy   String?
+  createdAt   DateTime   @default(now())
+  votes       PollVote[]
+}
+
+model PollVote {
+  id          String   @id @default(cuid())
+  poll        Poll     @relation(fields: [pollId], references: [id])
+  pollId      String
+  voterEmail  String
+  optionIndex Int
+  createdAt   DateTime @default(now())
+
+  @@unique([pollId, voterEmail])
+}
+
+enum BoardType {
+  RECADO
+  ELOGIO
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  team        String
+  owner       String?
+  assigner    String?
+  priority    String    @default("media")
+  dueDate     DateTime?
+  completedAt DateTime?
+  status      String    @default("todo")
+  createdAt   DateTime  @default(now())
+}
+
+model Sponsor {
+  id               String   @id @default(cuid())
+  company          String
+  contact          String
+  value            String?
+  status           String   @default("Negociando")
+  delivery         String   @default("—")
+  category         String   @default("PATROCINIO") // PATROCINIO ou PARCERIA
+  responsibleName  String?
+  responsibleEmail String?
+  startDate        DateTime?
+  endDate          DateTime?
+  notes            String?
+  createdAt        DateTime @default(now())
+}
+
+model BoardPost {
+  id         String    @id @default(cuid())
+  type       BoardType
+  authorName String
+  message    String
+  createdAt  DateTime  @default(now())
+}
+
+enum PointsReason {
+  MENSALIDADE_EM_DIA
+  EVENTO_PRESENCA
+  TREINO_INSCRICAO
+  TREINO_PRESENCA
+  COMPRA_LOJA
+  ENGAJAMENTO_SOCIAL
+}
+
+model PointsEntry {
+  id       String       @id @default(cuid())
+  member   Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId String
+  reason   PointsReason
+  points   Int
+  note     String?
+  createdAt DateTime    @default(now())
+}
+
+model EventCheckIn {
+  id        String   @id @default(cuid())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, memberId])
+}
+
+enum SocialSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model SocialSubmission {
+  id         String                 @id @default(cuid())
+  member     Member                 @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId   String
+  link       String
+  note       String?
+  status     SocialSubmissionStatus @default(PENDING)
+  reviewedBy String?
+  createdAt  DateTime               @default(now())
+}

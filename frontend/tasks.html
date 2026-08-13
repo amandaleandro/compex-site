@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tarefas — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="tasks"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Diretoria</p><h1>Quadro de tarefas</h1><p>Acompanhe o que está a fazer, em andamento e concluído.</p></div>
+    <button id="new-task" class="btn btn-primary">+ Nova tarefa</button>
+  </header>
+
+  <!-- Metric Cards -->
+  <div class="grid grid-4" style="margin-bottom:20px">
+    <div class="metric-card">
+      <p>Abertas</p>
+      <strong id="kpi-open">0</strong>
+    </div>
+    <div class="metric-card">
+      <p>Em Andamento</p>
+      <strong id="kpi-doing">0</strong>
+    </div>
+    <div class="metric-card" style="border-color:#fbe9e6">
+      <p style="color:#c0392b">Atrasadas</p>
+      <strong id="kpi-overdue" style="color:#c0392b">0</strong>
+    </div>
+    <div class="metric-card">
+      <p style="color:#0d8a4f">Concluídas</p>
+      <strong id="kpi-done" style="color:#0d8a4f">0</strong>
+    </div>
+  </div>
+
+  <!-- Toolbar de Filtros -->
+  <div class="toolbar" style="margin-bottom:20px">
+    <input type="search" id="search-task" placeholder="🔍 Buscar tarefa..." style="max-width:240px">
+    <select id="filter-team" style="max-width:180px">
+      <option value="">Todos departamentos</option>
+      <option value="Presidência">Presidência</option>
+      <option value="Esportes">Esportes</option>
+      <option value="Financeiro">Financeiro</option>
+      <option value="Eventos">Eventos</option>
+      <option value="Marketing">Marketing</option>
+      <option value="Produtos">Produtos</option>
+      <option value="Patrimônio">Patrimônio</option>
+      <option value="Geral">Geral</option>
+    </select>
+    <select id="filter-priority" style="max-width:160px">
+      <option value="">Todas prioridades</option>
+      <option value="alta">🔴 Alta / Urgente</option>
+      <option value="media">🟡 Média</option>
+      <option value="baixa">🟢 Baixa</option>
+    </select>
+    <button type="button" id="btn-my-tasks" class="btn btn-ghost btn-sm" style="height:38px">👤 Minhas tarefas</button>
+  </div>
+
+  <div class="kanban">
+    <div class="kanban-col"><h3>A fazer</h3><div id="todo"></div></div>
+    <div class="kanban-col"><h3>Em andamento</h3><div id="doing"></div></div>
+    <div class="kanban-col"><h3>Concluído</h3><div id="done"></div></div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="modal">
+  <form class="modal" id="form">
+    <input type="hidden" id="task-id">
+    <h2 id="modal-title">Nova tarefa</h2>
+    <div class="field"><label>Título</label><input id="title-task" required placeholder="Ex: Organizar torneio de futsal"></div>
+    <div class="field-row">
+      <div class="field">
+        <label>Equipe / Departamento</label>
+        <select id="team" required>
+          <option value="Presidência">Presidência</option>
+          <option value="Esportes">Esportes</option>
+          <option value="Financeiro">Financeiro</option>
+          <option value="Eventos">Eventos</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Produtos">Produtos</option>
+          <option value="Patrimônio">Patrimônio</option>
+          <option value="Geral">Geral</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Executante (Responsável)</label>
+        <select id="owner">
+          <option value="">Selecione o responsável...</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Solicitante (Quem direcionou)</label>
+        <input id="assigner" placeholder="Automaticamente preenchido" readonly style="background:#f7f8fa;color:#667085;cursor:not-allowed">
+      </div>
+      <div class="field">
+        <label>Urgência / Prioridade</label>
+        <select id="priority">
+          <option value="baixa">🟢 Baixa</option>
+          <option value="media" selected>🟡 Média</option>
+          <option value="alta">🔴 Alta / Urgente</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Prazo Limite</label><input id="due" type="date"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="save-task-btn">Salvar</button>
+    </div>
+  </form>
+</div>
+<script src="tasks.js"></script>
+</body>
+</html>

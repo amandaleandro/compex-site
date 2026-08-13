@@ -1,0 +1,28 @@
+{
+  "name": "compex-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portal de gestão da Atlética Computação e Exatas",
+  "scripts": {
+    "start": "node backend/server.js",
+    "db:generate": "prisma generate --config backend/prisma.config.ts",
+    "db:migrate": "prisma migrate dev --config backend/prisma.config.ts",
+    "db:seed": "node backend/prisma/seed.js"
+  },
+  "devDependencies": {
+    "dotenv": "latest",
+    "playwright": "^1.62.1",
+    "pngjs": "^7.0.0",
+    "prisma": "latest"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "latest",
+    "@prisma/client": "latest",
+    "bcryptjs": "^3.0.3",
+    "busboy": "^1.6.0",
+    "jsqr": "^1.4.0",
+    "mercadopago": "^3.4.0",
+    "pg": "latest",
+    "qrcode": "^1.5.4"
+  }
+}

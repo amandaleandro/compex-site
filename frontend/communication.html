@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comunicação — Gestão COMPEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="admin-shell" data-active="communication"></div>
+<main class="shell-main">
+  <header class="shell-topbar">
+    <div><p class="eyebrow">Comunicação</p><h1>Comunicados</h1><p>Mensagens publicadas para a comunidade COMPEX.</p></div>
+    <button id="new-message" class="btn btn-primary">+ Novo comunicado</button>
+  </header>
+
+  <section class="grid grid-2" style="margin-bottom:18px">
+    <article class="metric-card"><p>Publicados</p><strong id="sent">--</strong></article>
+    <article class="metric-card"><p>Rascunhos</p><strong id="drafts">--</strong></article>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <select id="filter">
+        <option value="all">Todas as categorias</option>
+        <option value="Geral">Geral</option>
+        <option value="Eventos">Eventos</option>
+        <option value="Financeiro">Financeiro</option>
+        <option value="Esportes">Esportes</option>
+      </select>
+    </div>
+    <div id="messages"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="modal">
+  <form class="modal" id="form">
+    <h2>Novo comunicado</h2>
+    <div class="field"><label>Assunto</label><input id="subject" required></div>
+    <div class="field"><label>Categoria</label>
+      <select id="audience"><option>Geral</option><option>Eventos</option><option>Financeiro</option><option>Esportes</option></select>
+    </div>
+    <div class="field"><label>Mensagem</label><textarea id="body" rows="3" required></textarea></div>
+    <div class="field"><label>Enviar Foto (Opcional)</label><input type="file" id="imageFile" accept="image/*"></div>
+    <div class="field"><label>Enviar Vídeo ou colar link YouTube / Vimeo / MP4 (Opcional)</label><input type="file" id="videoFile" accept="video/*" style="margin-bottom:6px;"><input id="videoUrl" placeholder="Ou cole a URL do vídeo aqui..."></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="close">Cancelar</button>
+      <button class="btn btn-primary" type="submit">Publicar</button>
+    </div>
+  </form>
+</div>
+<script src="communication.js"></script>
+</body>
+</html>

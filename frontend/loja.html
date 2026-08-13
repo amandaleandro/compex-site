@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loja — CompExatas</title><link rel="stylesheet" href="associate-portal.css"><link rel="stylesheet" href="associate-extra.css"></head>
+<body>
+<header class="member-topbar"><a class="brand" href="portal-associado.html"><img src="/public/assets/compex-logo.png?v=5" alt="CompExatas"><span>ATLÉTICA<br><b>COMPUTAÇÃO<br>E EXATAS</b><small>UFU</small></span></a><nav><a href="portal-associado.html">Início</a><a href="agenda.html">Eventos</a><a href="carteirinha.html">Carteirinha</a><a href="beneficios.html">Benefícios</a><a href="notificacoes.html">Notificações</a></nav><a class="profile-link" href="configuracoes.html">♙ &nbsp; Amanda Silva · Minha conta</a><a class="exit" href="index.html">Sair ↗</a></header>
+<main>
+<div class="page-head"><p class="eyebrow">MINHA COMPEX / LOJA</p><h1>Loja oficial</h1><p>Camisas, ingressos e produtos da atlética. Pagamento via Mercado Pago.</p></div>
+<section class="simple-panel">
+  <div class="product-grid" id="product-grid"><p class="empty-note">Carregando produtos…</p></div>
+  <div class="cart-bar" id="cart-bar" hidden><b id="cart-summary">0 itens</b><button id="checkout-button">Finalizar pedido →</button></div>
+  <p id="checkout-note" class="empty-note" style="margin-top:14px;display:none"></p>
+<section class="simple-panel" style="margin-top:24px">
+  <h2>Meus Pedidos & Encomendas</h2>
+  <div id="my-orders-list" style="margin-top:12px"><p class="empty-note">Carregando seus pedidos...</p></div>
+</section>
+</main>
+
+<!-- Modal de Opções do Produto (Tamanho & Personalização) -->
+<div class="modal-backdrop" id="modal-product-options">
+  <form class="modal" id="form-product-options">
+    <h2 id="opt-product-title">Opções do Produto</h2>
+    <input type="hidden" id="opt-product-id">
+
+    <div class="field" id="field-size-container" style="display:none;margin-top:12px">
+      <label>Selecione o Tamanho *</label>
+      <select id="opt-size">
+        <option value="PP">PP</option>
+        <option value="P">P</option>
+        <option value="M" selected>M</option>
+        <option value="G">G</option>
+        <option value="GG">GG</option>
+        <option value="XGG">XGG</option>
+      </select>
+    </div>
+
+    <div id="field-customization-container" style="display:none;background:#f7fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0;margin-top:12px">
+      <label style="font-weight:700">✍️ Personalização (Opcional)</label>
+      <div class="field-row" style="margin-top:8px">
+        <div class="field"><label>Nome nas costas</label><input id="opt-custom-name" placeholder="Ex: SILVA"></div>
+        <div class="field"><label>Número</label><input id="opt-custom-number" placeholder="Ex: 10" type="number"></div>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:18px">
+      <button type="button" class="btn btn-ghost" id="close-options">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Adicionar ao Carrinho</button>
+    </div>
+  </form>
+</div>
+<script src="loja.js"></script>
+</body>
+</html>
