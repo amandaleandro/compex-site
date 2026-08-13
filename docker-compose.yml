@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: compex
-      POSTGRES_PASSWORD: compex_dev
+      POSTGRES_PASSWORD: jArZOhwQJmbd4HtKrOn5fuBsOjJ6
       POSTGRES_DB: compex
     ports:
       - "55432:5432"
