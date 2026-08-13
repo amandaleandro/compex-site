@@ -8,6 +8,7 @@ const { send, body } = require('../lib/http');
 const { resolveSession, bearerToken, canManageAccounts, sessions, persistSessions } = require('../lib/sessions');
 const { SESSION_TTL_MS, LEGACY_TOKENS, INTERNAL_ROLES, uploadsDir, associatePhotosDir } = require('../lib/constants');
 const { computeFinanceOverview } = require('../lib/finance');
+const { loginSchema, validate, DOCUMENT_MIME_TYPES, IMAGE_MIME_TYPES, isAllowedMime } = require('../lib/validation');
 
 // Trata as rotas de autenticação, diretoria/advertências, enquetes, mural, check-ins,
 // stats/dashboard e uploads de documentos/foto de perfil. Retorna `true` quando a rota
@@ -16,8 +17,10 @@ const { computeFinanceOverview } = require('../lib/finance');
 async function handleGestaoRoutes(url, req, res) {
   if (url.pathname === '/api/auth/login' && req.method === 'POST') {
     await body(req).then(async credentials => {
-      const email = (credentials.email || '').trim().toLowerCase();
-      const password = credentials.password || '';
+      const check = validate(loginSchema, credentials);
+      if (!check.ok) return send(res, 400, { error: check.message });
+      const email = check.data.email.toLowerCase();
+      const password = check.data.password;
       const respond = (user, token) => {
         res.setHeader('Set-Cookie', `compex_role=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}`);
         send(res, 200, { user, token });
@@ -442,6 +445,11 @@ async function handleGestaoRoutes(url, req, res) {
     const busboy = Busboy({ headers: req.headers, limits: { fileSize: 25 * 1024 * 1024 } });
     busboy.on('field', (name, value) => { fields[name] = value; });
     busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, DOCUMENT_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie PDF, Word, Excel, PowerPoint, texto ou imagem.';
+        stream.resume();
+        return;
+      }
       const safeName = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(info.filename || '')}`;
       const dest = path.join(uploadsDir, safeName);
       stream.pipe(fs.createWriteStream(dest));
@@ -469,6 +477,11 @@ async function handleGestaoRoutes(url, req, res) {
     let fileError = null;
     const busboy = Busboy({ headers: req.headers, limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
     busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, IMAGE_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem png, jpg ou webp.';
+        stream.resume();
+        return;
+      }
       const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
       const safeName = `${member.id}${extension}`;
       const destination = path.join(associatePhotosDir, safeName);

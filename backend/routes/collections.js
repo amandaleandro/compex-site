@@ -10,6 +10,7 @@ const { readData, writeData, send, body } = require('../lib/http');
 const { resolveSession, bearerToken, canManageAccounts } = require('../lib/sessions');
 const { INTERNAL_ROLES } = require('../lib/constants');
 const { teamSlotWeight, chargeSessionParticipants, computeFinanceOverview } = require('../lib/finance');
+const { transactionCreateSchema, transactionUpdateSchema, validate, IMAGE_MIME_TYPES, NEWS_MEDIA_MIME_TYPES, isAllowedMime } = require('../lib/validation');
 
 function collection(name, req, res) {
   const data = readData();
@@ -148,14 +149,23 @@ async function databaseCollection(name, req, res, url) {
   }
   if (name === 'transactions') {
     if (req.method === 'GET') return send(res, 200, (await prisma.transaction.findMany({ orderBy: { createdAt: 'desc' } })).map(item => ({ ...item, amount: Number(item.amount), type: item.type === 'INCOME' ? 'income' : 'expense' })));
-    if (req.method === 'POST') return body(req).then(async item => { const transaction = await prisma.transaction.create({ data: { description: item.description, amount: Number(item.amount), type: item.type === 'income' ? 'INCOME' : 'EXPENSE', category: item.category || 'OperaÃ§Ã£o' } }); send(res, 201, { ...transaction, amount: Number(transaction.amount) }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'POST') return body(req).then(async item => {
+      const check = validate(transactionCreateSchema, item);
+      if (!check.ok) return send(res, 400, { error: check.message });
+      const valid = check.data;
+      const transaction = await prisma.transaction.create({ data: { description: valid.description, amount: valid.amount, type: valid.type === 'income' ? 'INCOME' : 'EXPENSE', category: valid.category || 'Operação' } });
+      send(res, 201, { ...transaction, amount: Number(transaction.amount) });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'PUT') return body(req).then(async item => {
+      const check = validate(transactionUpdateSchema, item);
+      if (!check.ok) return send(res, 400, { error: check.message });
+      const valid = check.data;
       const data = {};
-      if (item.description !== undefined) data.description = item.description;
-      if (item.amount !== undefined) data.amount = Number(item.amount);
-      if (item.category !== undefined) data.category = item.category;
-      if (item.type !== undefined) data.type = item.type === 'income' ? 'INCOME' : 'EXPENSE';
-      const transaction = await prisma.transaction.update({ where: { id: item.id }, data });
+      if (valid.description !== undefined) data.description = valid.description;
+      if (valid.amount !== undefined) data.amount = valid.amount;
+      if (valid.category !== undefined) data.category = valid.category;
+      if (valid.type !== undefined) data.type = valid.type === 'income' ? 'INCOME' : 'EXPENSE';
+      const transaction = await prisma.transaction.update({ where: { id: valid.id }, data });
       send(res, 200, { ...transaction, amount: Number(transaction.amount), type: transaction.type === 'INCOME' ? 'income' : 'expense' });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.transaction.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
@@ -472,6 +482,11 @@ async function databaseCollection(name, req, res, url) {
     let fileError = null;
     const busboy = Busboy({ headers: req.headers, limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
     busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, NEWS_MEDIA_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem (png/jpg/webp) ou vídeo (mp4/webm/mov/ogg).';
+        stream.resume();
+        return;
+      }
       const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
       const safeName = `news_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
       const destination = path.join(newsMediaDir, safeName);
@@ -494,6 +509,11 @@ async function databaseCollection(name, req, res, url) {
     let fileError = null;
     const busboy = Busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
     busboy.on('file', (name, stream, info) => {
+      if (!isAllowedMime(info.mimeType, IMAGE_MIME_TYPES)) {
+        fileError = 'Tipo de arquivo não permitido. Envie uma imagem png, jpg ou webp.';
+        stream.resume();
+        return;
+      }
       const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
       const safeName = `product_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${extension}`;
       const destination = path.join(productPhotosDir, safeName);
