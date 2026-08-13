@@ -21,22 +21,9 @@ if (!fs.existsSync(patrimonioDocsDir)) fs.mkdirSync(patrimonioDocsDir, { recursi
 const dataFile = path.join(__dirname, 'data.json');
 const port = process.env.PORT || 3000;
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.pdf': 'application/pdf', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
-const initialData = { 
-  events: [], 
-  members: [], 
-  news: [], 
-  transactions: [],
-  benefits: [
-    { id: 'b1', name: 'Café Byte', category: 'Alimentação', discount: '10% OFF', description: 'Café, lanches e encontros para recarregar.', icon: '☕' },
-    { id: 'b2', name: 'Arena Sport', category: 'Esporte', discount: '15% OFF', description: 'Equipamentos, acessórios e materiais esportivos.', icon: '👟' },
-    { id: 'b3', name: 'Gráfica Exatas', category: 'Serviços', discount: '20% OFF', description: 'Impressões, encadernações e materiais acadêmicos.', icon: '▣' },
-    { id: 'b4', name: 'Pizza da Quadra', category: 'Alimentação', discount: 'R$ 10 OFF', description: 'Delivery especial para dias de treino e jogo.', icon: '🍕' }
-  ],
-  plans: [
-    { id: 'p1', name: 'Plano Anual', price: '49,90', period: '/ano', slots: 1, icon: '☆', description: 'Carteirinha digital, benefícios e eventos durante 12 meses.' },
-    { id: 'p2', name: 'Plano Semestral', price: '29,90', period: '/semestre', slots: 1, icon: '▦', description: 'Acesso completo por 6 meses com carteirinha digital.' }
-  ]
-};
+// events/members/news/transactions/benefits/plans agora vivem inteiramente no Prisma/Postgres
+// (ver databaseCollection); data.json não guarda mais nenhuma dessas coleções.
+const initialData = {};
 
 // Sessões da gestão: tokens fixos de demonstração continuam funcionando (o portal do
 // associado, em associate.js, ainda depende literalmente desses dois valores). Contas
@@ -349,6 +336,43 @@ async function databaseCollection(name, req, res, url) {
       send(res, 200, { ...transaction, amount: Number(transaction.amount), type: transaction.type === 'INCOME' ? 'income' : 'expense' });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.transaction.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+  }
+  if (name === 'benefits') {
+    if (req.method === 'GET') return send(res, 200, (await prisma.benefit.findMany({ orderBy: { createdAt: 'asc' } })).map(item => ({ ...item, updatedAt: item.updatedAt.toISOString(), createdAt: item.createdAt.toISOString() })));
+    if (req.method === 'POST') return body(req).then(async item => {
+      const benefit = await prisma.benefit.create({ data: { name: item.name, category: item.category, discount: item.discount, description: item.description || null, icon: item.icon || null } });
+      send(res, 201, { ...benefit, updatedAt: benefit.updatedAt.toISOString(), createdAt: benefit.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'PUT') return body(req).then(async item => {
+      const data = {};
+      if (item.name !== undefined) data.name = item.name;
+      if (item.category !== undefined) data.category = item.category;
+      if (item.discount !== undefined) data.discount = item.discount;
+      if (item.description !== undefined) data.description = item.description || null;
+      if (item.icon !== undefined) data.icon = item.icon || null;
+      const benefit = await prisma.benefit.update({ where: { id: item.id }, data });
+      send(res, 200, { ...benefit, updatedAt: benefit.updatedAt.toISOString(), createdAt: benefit.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Registro não encontrado' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.benefit.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Informe o id do registro' }); });
+  }
+  if (name === 'plans') {
+    if (req.method === 'GET') return send(res, 200, (await prisma.plan.findMany({ orderBy: { createdAt: 'asc' } })).map(item => ({ ...item, updatedAt: item.updatedAt.toISOString(), createdAt: item.createdAt.toISOString() })));
+    if (req.method === 'POST') return body(req).then(async item => {
+      const plan = await prisma.plan.create({ data: { name: item.name, price: item.price, period: item.period || '/ano', slots: item.slots !== undefined ? Number(item.slots) : 1, icon: item.icon || null, description: item.description || null } });
+      send(res, 201, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'PUT') return body(req).then(async item => {
+      const data = {};
+      if (item.name !== undefined) data.name = item.name;
+      if (item.price !== undefined) data.price = item.price;
+      if (item.period !== undefined) data.period = item.period;
+      if (item.slots !== undefined) data.slots = Number(item.slots);
+      if (item.icon !== undefined) data.icon = item.icon || null;
+      if (item.description !== undefined) data.description = item.description || null;
+      const plan = await prisma.plan.update({ where: { id: item.id }, data });
+      send(res, 200, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Registro não encontrado' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.plan.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Informe o id do registro' }); });
   }
   if (name === 'finance-overview') {
     const session = resolveSession(bearerToken(req));
