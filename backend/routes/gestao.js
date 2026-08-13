@@ -1,0 +1,492 @@
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const Busboy = require('busboy');
+const path = require('path');
+const fs = require('fs');
+const { prisma } = require('../db');
+const { send, body } = require('../lib/http');
+const { resolveSession, bearerToken, canManageAccounts, sessions, persistSessions } = require('../lib/sessions');
+const { SESSION_TTL_MS, LEGACY_TOKENS, INTERNAL_ROLES, uploadsDir, associatePhotosDir } = require('../lib/constants');
+const { computeFinanceOverview } = require('../lib/finance');
+
+// Trata as rotas de autenticação, diretoria/advertências, enquetes, mural, check-ins,
+// stats/dashboard e uploads de documentos/foto de perfil. Retorna `true` quando a rota
+// bateu e a resposta já foi enviada (ou está em andamento); `false` quando nenhuma rota
+// bateu, para o router seguir para o próximo grupo de handlers.
+async function handleGestaoRoutes(url, req, res) {
+  if (url.pathname === '/api/auth/login' && req.method === 'POST') {
+    await body(req).then(async credentials => {
+      const email = (credentials.email || '').trim().toLowerCase();
+      const password = credentials.password || '';
+      const respond = (user, token) => {
+        res.setHeader('Set-Cookie', `compex_role=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}`);
+        send(res, 200, { user, token });
+      };
+      if (email === 'diretoria@compex.com.br' && password === 'compex2026') return respond({ name: 'Amanda Silva', role: 'PRESIDENCIA', email }, 'demo-session-compex');
+      if (email === 'associado@compex.com.br' && password === 'compex2026') return respond({ name: 'Lucas Associado', role: 'ASSOCIADO', email }, 'demo-session-associado');
+      if (!prisma) return send(res, 401, { error: 'E-mail ou senha inválidos' });
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user || !(await bcrypt.compare(password, user.password))) return send(res, 401, { error: 'E-mail ou senha inválidos' });
+      const token = crypto.randomBytes(24).toString('hex');
+      sessions.set(token, { name: user.name, role: user.role, rank: user.rank, email: user.email, expiresAt: Date.now() + SESSION_TTL_MS });
+      persistSessions();
+      respond({ name: user.name, role: user.role, rank: user.rank, email: user.email }, token);
+    }).catch(() => send(res, 400, { error: 'JSON invÃ¡lido' }));
+    return true;
+  }
+  if (url.pathname === '/api/auth/me' && req.method === 'GET') {
+    const session = resolveSession(bearerToken(req));
+    if (!session) { send(res, 401, { authenticated: false, error: 'Sessão inválida' }); return true; }
+    let member = null;
+    if (prisma) {
+      const user = await prisma.user.findUnique({ where: { email: session.email }, include: { member: true } });
+      if (user?.member) member = { status: user.member.status.toLowerCase(), plan: user.member.plan, subscriptionStatus: user.member.subscriptionStatus, membershipKind: user.member.membershipKind };
+    }
+    send(res, 200, { authenticated: true, user: { name: session.name, role: session.role, rank: session.rank, email: session.email, member } });
+    return true;
+  }
+  if (url.pathname === '/api/me/become-member' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!INTERNAL_ROLES.has(session.role)) { send(res, 403, { error: 'Disponível para contas da diretoria.' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      const user = await prisma.user.findUnique({ where: { email: session.email }, include: { member: true } });
+      if (!user) return send(res, 404, { error: 'Conta não encontrada' });
+      if (user.member) return send(res, 400, { error: 'Você já é sócio da atlética.' });
+      const member = await prisma.member.create({
+        data: {
+          userId: user.id, course: item.course || '—', plan: item.plan === 'Semestral' ? 'Semestral' : 'Anual',
+          socialName: item.socialName || null, nickname: item.nickname || null, sex: item.sex || null,
+          shirtSize: item.shirtSize || null, instagram: item.instagram || null,
+          memberType: 'TORCEDOR', status: 'PENDING',
+        },
+      });
+      send(res, 201, { id: member.id, status: member.status.toLowerCase() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
+    sessions.delete(bearerToken(req));
+    persistSessions();
+    res.setHeader('Set-Cookie', 'compex_role=; Path=/; Max-Age=0');
+    send(res, 200, { ok: true });
+    return true;
+  }
+  if (url.pathname === '/api/auth/change-password' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (LEGACY_TOKENS[bearerToken(req)]) return send(res, 400, { error: 'Contas de demonstração não podem trocar senha por aqui.' });
+      const user = await prisma.user.findUnique({ where: { email: session.email } });
+      if (!user || !(await bcrypt.compare(item.currentPassword || '', user.password))) return send(res, 401, { error: 'Senha atual incorreta' });
+      if (!item.newPassword || item.newPassword.length < 8) return send(res, 400, { error: 'A nova senha precisa ter ao menos 8 caracteres' });
+      await prisma.user.update({ where: { email: session.email }, data: { password: await bcrypt.hash(item.newPassword, 10) } });
+      send(res, 200, { ok: true });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  const rankLimit = (role, rank) => {
+    if (role === 'PRESIDENCIA') return rank === 'DIRETOR' ? 1 : 2;
+    return rank === 'DIRETOR' ? 2 : Infinity;
+  };
+  const rankLimitError = (role, rank) => {
+    if (role === 'PRESIDENCIA') return rank === 'DIRETOR' ? 'Já existe um(a) presidente cadastrado(a) — cadastre como vice-presidente.' : 'A presidência já tem 2 vice-presidentes — o máximo.';
+    return `${role} já tem 2 diretores — o máximo por área. Cadastre como coordenador.`;
+  };
+  if (url.pathname === '/api/directors' && req.method === 'GET') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 200, []); return true; }
+    const where = session.role === 'PRESIDENCIA'
+      ? { role: { not: 'ASSOCIADO' }, email: { not: session.email } }
+      : { role: session.role, email: { not: session.email } };
+    await prisma.user.findMany({ where, orderBy: { createdAt: 'asc' }, include: { member: true } })
+      .then(users => send(res, 200, users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, rank: u.rank, birthDate: u.birthDate ? u.birthDate.toISOString() : null, member: u.member ? { course: u.member.course, plan: u.member.plan, status: u.member.status.toLowerCase() } : null }))))
+      .catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/directors' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      const isPresidencia = session.role === 'PRESIDENCIA';
+      if (isPresidencia && !INTERNAL_ROLES.has(item.role)) return send(res, 400, { error: 'Papel inválido' });
+      const role = isPresidencia ? item.role : session.role;
+      const rank = isPresidencia ? (item.rank === 'COORDENADOR' ? 'COORDENADOR' : 'DIRETOR') : 'COORDENADOR';
+      const limit = rankLimit(role, rank);
+      if (limit !== Infinity) {
+        const count = await prisma.user.count({ where: { role, rank } });
+        if (count >= limit) return send(res, 400, { error: rankLimitError(role, rank) });
+      }
+      const hashed = await bcrypt.hash(item.password || crypto.randomBytes(6).toString('hex'), 10);
+      const user = await prisma.user.create({
+        data: { name: item.name, email: (item.email || '').trim().toLowerCase(), password: hashed, role, rank, birthDate: item.birthDate ? new Date(item.birthDate) : null },
+      });
+      send(res, 201, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: null });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/directors' && req.method === 'PUT') {
+    const session = resolveSession(bearerToken(req));
+    if (!session || session.role !== 'PRESIDENCIA') { send(res, 403, { error: 'Acesso restrito à Presidência' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (item.role && !INTERNAL_ROLES.has(item.role)) return send(res, 400, { error: 'Papel inválido' });
+      if (item.rank && !['DIRETOR', 'COORDENADOR'].includes(item.rank)) return send(res, 400, { error: 'Nível inválido' });
+      if (item.name !== undefined && !item.name.trim()) return send(res, 400, { error: 'Nome não pode ficar vazio' });
+      if (item.email !== undefined && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(item.email)) return send(res, 400, { error: 'E-mail inválido' });
+      const data = {};
+      if (item.name !== undefined) data.name = item.name.trim();
+      if (item.email !== undefined) data.email = item.email.trim().toLowerCase();
+      if (item.role) data.role = item.role;
+      if (item.birthDate !== undefined) data.birthDate = item.birthDate ? new Date(item.birthDate) : null;
+      if (item.rank) data.rank = item.rank;
+      if (item.role || item.rank) {
+        const current = await prisma.user.findUnique({ where: { id: item.id } });
+        if (!current) return send(res, 404, { error: 'Conta não encontrada' });
+        const targetRole = item.role || current.role;
+        const targetRank = item.rank || current.rank;
+        if (targetRole !== current.role || targetRank !== current.rank) {
+          const limit = rankLimit(targetRole, targetRank);
+          if (limit !== Infinity) {
+            const count = await prisma.user.count({ where: { role: targetRole, rank: targetRank, id: { not: item.id } } });
+            if (count >= limit) return send(res, 400, { error: rankLimitError(targetRole, targetRank) });
+          }
+        }
+      }
+      const user = await prisma.user.update({ where: { id: item.id }, data, include: { member: true } });
+      send(res, 200, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: user.member ? { course: user.member.course, plan: user.member.plan, status: user.member.status.toLowerCase() } : null });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/directors' && req.method === 'DELETE') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (session.role !== 'PRESIDENCIA') {
+        const target = await prisma.user.findUnique({ where: { id: item.id } });
+        if (!target || target.role !== session.role || target.rank !== 'COORDENADOR') return send(res, 403, { error: 'Só é possível remover coordenadores do seu próprio departamento' });
+      }
+      await prisma.directorWarning.deleteMany({ where: { userId: item.id } });
+      await prisma.user.delete({ where: { id: item.id } });
+      send(res, 200, { ok: true });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/warnings' && req.method === 'GET') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 200, []); return true; }
+    const where = session.role === 'PRESIDENCIA' ? {} : { user: { role: session.role } };
+    await prisma.directorWarning.findMany({ where, include: { user: true }, orderBy: { createdAt: 'desc' } })
+      .then(rows => send(res, 200, rows.map(w => ({ id: w.id, type: w.type, reason: w.reason, createdAt: w.createdAt.toISOString(), userId: w.userId, userName: w.user.name, userRole: w.user.role }))))
+      .catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/warnings' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      const target = await prisma.user.findUnique({ where: { id: item.userId } });
+      if (!target) return send(res, 404, { error: 'Conta não encontrada' });
+      if (session.role !== 'PRESIDENCIA' && target.role !== session.role) return send(res, 403, { error: 'Só é possível registrar advertências no seu próprio departamento' });
+      if (!['ADVERTENCIA', 'SUSPENSAO', 'DESLIGAMENTO'].includes(item.type)) return send(res, 400, { error: 'Tipo inválido' });
+      const warning = await prisma.directorWarning.create({ data: { userId: item.userId, type: item.type, reason: item.reason || '' } });
+      send(res, 201, { id: warning.id, type: warning.type, reason: warning.reason, createdAt: warning.createdAt.toISOString(), userId: warning.userId, userName: target.name, userRole: target.role });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/warnings' && req.method === 'DELETE') {
+    const session = resolveSession(bearerToken(req));
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Acesso restrito à Presidência e diretores' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      await prisma.directorWarning.delete({ where: { id: item.id } });
+      send(res, 200, { ok: true });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  const internalSession = req => { const session = resolveSession(bearerToken(req)); return session && INTERNAL_ROLES.has(session.role) ? session : null; };
+  if (url.pathname === '/api/polls' && req.method === 'GET') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 200, []); return true; }
+    const now = new Date();
+    await prisma.poll.findMany({ include: { votes: true }, orderBy: { createdAt: 'desc' } }).then(polls => send(res, 200, polls.map(poll => {
+      const options = poll.options;
+      const results = options.map((option, index) => ({ option, votes: poll.votes.filter(v => v.optionIndex === index).length }));
+      const mine = poll.votes.find(v => v.voterEmail === session.email);
+      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= now : false;
+      const effectiveClosed = poll.closed || isExpired;
+      return {
+        id: poll.id,
+        question: poll.question,
+        options,
+        closed: poll.closed,
+        isExpired,
+        effectiveClosed,
+        expiresAt: poll.expiresAt ? poll.expiresAt.toISOString() : null,
+        createdBy: poll.createdBy,
+        createdAt: poll.createdAt.toISOString(),
+        results,
+        totalVotes: poll.votes.length,
+        myVote: mine ? mine.optionIndex : null
+      };
+    }))).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/polls' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      const options = (item.options || []).map(o => String(o).trim()).filter(Boolean);
+      if (!item.question || options.length < 2) return send(res, 400, { error: 'Informe a pergunta e ao menos 2 opções' });
+      let expiresAt = null;
+      if (item.expiresAt) {
+        const parsedDate = new Date(item.expiresAt);
+        if (!isNaN(parsedDate.getTime())) {
+          expiresAt = parsedDate;
+        }
+      }
+      const poll = await prisma.poll.create({ data: { question: item.question, options, expiresAt, createdBy: session.name } });
+      const now = new Date();
+      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= now : false;
+      send(res, 201, {
+        id: poll.id,
+        question: poll.question,
+        options: poll.options,
+        closed: poll.closed,
+        isExpired,
+        effectiveClosed: poll.closed || isExpired,
+        expiresAt: poll.expiresAt ? poll.expiresAt.toISOString() : null,
+        createdBy: poll.createdBy,
+        createdAt: poll.createdAt.toISOString(),
+        results: options.map(option => ({ option, votes: 0 })),
+        totalVotes: 0,
+        myVote: null
+      });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  const voteMatch = url.pathname.match(/^\/api\/polls\/([^/]+)\/vote$/);
+  if (voteMatch && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      const poll = await prisma.poll.findUnique({ where: { id: voteMatch[1] } });
+      if (!poll) return send(res, 404, { error: 'Enquete não encontrada' });
+      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= new Date() : false;
+      if (poll.closed || isExpired) return send(res, 400, { error: isExpired ? 'Enquete expirada para votação' : 'Enquete encerrada para votação' });
+      await prisma.pollVote.upsert({ where: { pollId_voterEmail: { pollId: poll.id, voterEmail: session.email } }, update: { optionIndex: Number(item.optionIndex) }, create: { pollId: poll.id, voterEmail: session.email, optionIndex: Number(item.optionIndex) } });
+      send(res, 200, { ok: true });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  const closeMatch = url.pathname.match(/^\/api\/polls\/([^/]+)\/close$/);
+  if (closeMatch && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await (async () => {
+      const poll = await prisma.poll.update({ where: { id: closeMatch[1] }, data: { closed: true }, include: { votes: true } });
+      const options = poll.options;
+      const results = options.map((option, index) => `${option}: ${poll.votes.filter(v => v.optionIndex === index).length} voto(s)`).join(' · ');
+      await prisma.document.create({ data: { name: `Enquete: ${poll.question}`, category: 'Enquetes', url: '', isPublic: false } }).catch(() => {});
+      send(res, 200, { ok: true, summary: results });
+    })().catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  const deleteMatch = url.pathname.match(/^\/api\/polls\/([^/]+)$/);
+  if (deleteMatch && req.method === 'DELETE') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await (async () => {
+      await prisma.pollVote.deleteMany({ where: { pollId: deleteMatch[1] } });
+      await prisma.poll.delete({ where: { id: deleteMatch[1] } });
+      send(res, 200, { ok: true });
+    })().catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/board' && req.method === 'GET') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 200, []); return true; }
+    const type = url.searchParams.get('type');
+    await prisma.boardPost.findMany({ where: type ? { type } : undefined, orderBy: { createdAt: 'desc' }, take: 50 })
+      .then(rows => send(res, 200, rows.map(r => ({ ...r, createdAt: r.createdAt.toISOString() }))))
+      .catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/board' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (!['RECADO', 'ELOGIO'].includes(item.type) || !item.message) return send(res, 400, { error: 'Dados inválidos' });
+      const post = await prisma.boardPost.create({ data: { type: item.type, authorName: session.name, message: item.message } });
+      send(res, 201, { ...post, createdAt: post.createdAt.toISOString() });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/board' && req.method === 'DELETE') {
+    const session = internalSession(req);
+    if (!canManageAccounts(session)) { send(res, 403, { error: 'Somente diretor(a) do departamento ou presidência pode excluir recados' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => { await prisma.boardPost.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/checkins' && req.method === 'GET') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 200, { event: null, total: 0, recent: [] }); return true; }
+    await (async () => {
+      const event = await prisma.event.findFirst({ where: { published: true }, orderBy: { date: 'asc' } });
+      if (!event) return send(res, 200, { event: null, total: 0, recent: [] });
+      const checkins = await prisma.eventCheckIn.findMany({ where: { eventId: event.id }, include: { member: { include: { user: true } } }, orderBy: { createdAt: 'desc' } });
+      const confirmed = await prisma.member.count({ where: { status: 'ACTIVE' } });
+      send(res, 200, {
+        event: { id: event.id, name: event.name, date: event.date.toISOString(), location: event.location },
+        total: checkins.length,
+        confirmed,
+        waiting: Math.max(0, confirmed - checkins.length),
+        recent: checkins.slice(0, 10).map(c => ({ name: c.member.user.name, course: c.member.course, createdAt: c.createdAt.toISOString() }))
+      });
+    })().catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/checkins' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (!item.eventId) return send(res, 400, { error: 'Nenhum evento ativo' });
+      const code = (item.code || '').trim();
+      const member = await prisma.member.findFirst({ where: { OR: [{ registration: code }, { id: code }] }, include: { user: true } });
+      if (!member) return send(res, 404, { error: 'Código não encontrado. Confira a carteirinha do associado.' });
+      const existing = await prisma.eventCheckIn.findUnique({ where: { eventId_memberId: { eventId: item.eventId, memberId: member.id } } }).catch(() => null);
+      if (existing) return send(res, 200, { alreadyCheckedIn: true, member: { name: member.user.name, course: member.course } });
+      await prisma.eventCheckIn.create({ data: { eventId: item.eventId, memberId: member.id } });
+      send(res, 201, { alreadyCheckedIn: false, member: { name: member.user.name, course: member.course } });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/stats' && req.method === 'GET' && prisma) {
+    await Promise.all([
+      prisma.member.count({ where: { status: 'ACTIVE' } }),
+      prisma.event.count({ where: { published: true } }),
+      prisma.athlete.count(),
+      prisma.news.count({ where: { published: true } }),
+      computeFinanceOverview(),
+    ]).then(([members, events, athletes, news, finance]) => {
+      const income = finance.entries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+      const expense = finance.entries.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0);
+      send(res, 200, { members, events, athletes, news, income, expense, balance: income - expense, months: finance.months });
+    }).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/dashboard-extra' && req.method === 'GET') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 200, { birthdays: [], spotlight: null, upcomingGames: [], upcomingTrainings: [], todayTasks: [] }); return true; }
+    const now = new Date();
+    const todayKey = now.toISOString().slice(0, 10);
+    const roleLabel = { PRESIDENCIA: 'Presidência', FINANCEIRO: 'Financeiro', ESPORTES: 'Esportes', EVENTOS: 'Eventos', MARKETING: 'Marketing' };
+    await Promise.all([
+      prisma.user.findMany({ where: { role: { not: 'ASSOCIADO' }, birthDate: { not: null } } }),
+      prisma.task.findMany({ where: { status: 'done' } }),
+      prisma.user.findMany({ where: { role: { not: 'ASSOCIADO' } } }),
+      prisma.teamSession.findMany({ where: { type: 'JOGO', date: { gte: now } }, orderBy: { date: 'asc' }, take: 3, include: { team: true } }),
+      prisma.teamSession.findMany({ where: { type: 'TREINO', date: { gte: now } }, orderBy: { date: 'asc' }, take: 3, include: { team: true } }),
+      prisma.task.findMany({ where: { status: { not: 'done' } } }),
+    ]).then(([birthdayUsers, doneTasks, directors, games, trainings, openTasks]) => {
+      const birthdays = birthdayUsers
+        .filter(u => u.birthDate.getUTCMonth() === now.getUTCMonth())
+        .map(u => ({ name: u.name, role: roleLabel[u.role] || u.role, day: u.birthDate.getUTCDate() }))
+        .sort((a, b) => a.day - b.day);
+
+      const tally = {};
+      doneTasks.forEach(t => { if (t.owner) tally[t.owner] = (tally[t.owner] || 0) + 1; });
+      let spotlight = null;
+      let topCount = 0;
+      Object.entries(tally).forEach(([owner, count]) => {
+        if (count > topCount) {
+          const match = directors.find(d => d.name.toLowerCase() === owner.toLowerCase());
+          spotlight = { name: match ? match.name : owner, role: match ? (roleLabel[match.role] || match.role) : null, count };
+          topCount = count;
+        }
+      });
+
+      const mapSession = s => ({ id: s.id, teamName: s.team.name, date: s.date.toISOString(), location: s.location, coachName: s.coachName });
+      const todayTasks = openTasks.filter(t => t.dueDate && t.dueDate.toISOString().slice(0, 10) === todayKey)
+        .map(t => ({ id: t.id, title: t.title, team: t.team, owner: t.owner, status: t.status }));
+
+      send(res, 200, { birthdays, spotlight, upcomingGames: games.map(mapSession), upcomingTrainings: trainings.map(mapSession), todayTasks });
+    }).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/documents/upload' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    const fields = {};
+    let savedPath = null;
+    let fileError = null;
+    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 25 * 1024 * 1024 } });
+    busboy.on('field', (name, value) => { fields[name] = value; });
+    busboy.on('file', (name, stream, info) => {
+      const safeName = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${path.extname(info.filename || '')}`;
+      const dest = path.join(uploadsDir, safeName);
+      stream.pipe(fs.createWriteStream(dest));
+      stream.on('limit', () => { fileError = 'Arquivo maior que 25 MB'; });
+      savedPath = { safeName, originalName: info.filename };
+    });
+    busboy.on('finish', async () => {
+      if (fileError) return send(res, 400, { error: fileError });
+      if (!savedPath) return send(res, 400, { error: 'Nenhum arquivo enviado' });
+      try {
+        const document = await prisma.document.create({ data: { name: fields.name || savedPath.originalName, category: fields.category || 'Geral', url: `/uploads/${savedPath.safeName}`, isPublic: fields.access === 'public' } });
+        send(res, 201, { ...document, access: document.isPublic ? 'public' : 'private' });
+      } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
+    });
+    req.pipe(busboy);
+    return true;
+  }
+  if (url.pathname === '/api/me/photo' && req.method === 'POST') {
+    const session = resolveSession(bearerToken(req));
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    const member = await prisma.member.findFirst({ where: { user: { email: session.email } } });
+    if (!member) { send(res, 404, { error: 'Associado não encontrado' }); return true; }
+    let savedPath = null;
+    let fileError = null;
+    const busboy = Busboy({ headers: req.headers, limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+    busboy.on('file', (name, stream, info) => {
+      const extension = (path.extname(info.filename || '').toLowerCase() || '.jpg').replace(/[^.a-z0-9]/g, '');
+      const safeName = `${member.id}${extension}`;
+      const destination = path.join(associatePhotosDir, safeName);
+      stream.pipe(fs.createWriteStream(destination));
+      stream.on('limit', () => { fileError = 'A foto deve ter no máximo 8 MB'; });
+      savedPath = safeName;
+    });
+    busboy.on('finish', async () => {
+      if (fileError) return send(res, 400, { error: fileError });
+      if (!savedPath) return send(res, 400, { error: 'Nenhuma foto enviada' });
+      const url2 = `/uploads/associates/${savedPath}`;
+      await prisma.member.update({ where: { id: member.id }, data: { photoUrl: url2 } });
+      return send(res, 200, { url: url2 });
+    });
+    req.pipe(busboy);
+    return true;
+  }
+  return false;
+}
+
+module.exports = { handleGestaoRoutes };
