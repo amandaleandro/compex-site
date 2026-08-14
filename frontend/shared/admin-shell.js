@@ -60,7 +60,7 @@
     const token = sessionStorage.getItem('compex-token');
     try {
       const response = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token || ''}` } });
-      if (!response.ok) { window.location.href = '/public/gestao-login.html'; return; }
+      if (!response.ok) { window.location.href = '/login'; return; }
       const { user } = await response.json();
       document.querySelectorAll('[data-user-name]').forEach(el => { el.textContent = user.name; });
       document.querySelectorAll('[data-user-role]').forEach(el => { el.textContent = ROLE_LABELS[user.role] || user.role; });
@@ -72,10 +72,10 @@
         const link = document.createElement('a');
         link.id = 'shell-become-member';
         if (!user.member) {
-          link.href = '/public/associar-se.html';
+          link.href = '/cadastro';
           link.innerHTML = '<span class="ic">🎫</span><span>Tornar-se sócio</span>';
         } else {
-          link.href = '/associado/mensalidade.html';
+          link.href = '/associado/mensalidade';
           link.innerHTML = '<span class="ic">🎫</span><span>Pagar mensalidade</span>';
         }
         bottom.prepend(link);
@@ -89,7 +89,7 @@
     try { await fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token || ''}` } }); } catch {}
     sessionStorage.removeItem('compex-session');
     sessionStorage.removeItem('compex-token');
-    window.location.href = '/public/gestao-login.html';
+    window.location.href = '/login';
   });
 
   document.getElementById('shell-change-password').addEventListener('click', () => {

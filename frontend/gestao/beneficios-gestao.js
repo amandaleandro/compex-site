@@ -63,7 +63,7 @@ btnTopAction.onclick = () => {
 async function loadBenefits() {
   try {
     const response = await fetch('/api/benefits', { headers: authHeaders() });
-    if (response.status === 401) { window.location.href = '/public/gestao-login.html'; return DEFAULT_BENEFITS; }
+    if (response.status === 401) { window.location.href = '/login'; return DEFAULT_BENEFITS; }
     if (!response.ok) return DEFAULT_BENEFITS;
     const data = await response.json();
     return Array.isArray(data) ? data : DEFAULT_BENEFITS;

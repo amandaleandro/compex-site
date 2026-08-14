@@ -1,0 +1,170 @@
+.associate-shell .member-topbar {
+  position: relative;
+  z-index: 30;
+  display: grid !important;
+  grid-template-columns: 260px minmax(500px, 1fr) 350px;
+  align-items: center !important;
+  gap: clamp(24px, 3vw, 56px) !important;
+  width: 100% !important;
+  min-height: 104px !important;
+  height: 104px !important;
+  margin: 0 !important;
+  padding: 0 clamp(22px, 2.5vw, 48px) !important;
+  background: #fff !important;
+  border-bottom: 1px solid #dbe4f0 !important;
+  box-shadow: 0 2px 12px rgba(16, 44, 104, .05) !important;
+  color: #10244b !important;
+}
+
+.associate-shell .member-topbar .brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-width: 0 !important;
+  width: max-content !important;
+  color: #10244b !important;
+  line-height: .98 !important;
+}
+
+.associate-shell .member-topbar .brand img {
+  width: 76px !important;
+  height: 76px !important;
+  flex: 0 0 76px !important;
+  object-fit: contain !important;
+}
+
+.associate-shell .member-topbar .brand span {
+  display: block;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: .01em;
+}
+
+.associate-shell .member-topbar .brand b {
+  font-size: 17px !important;
+  letter-spacing: -.015em;
+}
+
+.associate-shell .member-topbar .brand small {
+  margin-top: 5px !important;
+  color: #155bea !important;
+  font-size: 11px !important;
+}
+
+.associate-shell .member-topbar > nav {
+  display: flex !important;
+  align-self: stretch !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(28px, 3.2vw, 64px) !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.associate-shell .member-topbar > nav a {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  padding: 3px 0 0 !important;
+  color: #26334b !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+.associate-shell .member-topbar > nav a.is-current::after {
+  bottom: 0 !important;
+  height: 3px !important;
+  border-radius: 3px 3px 0 0;
+}
+
+.associate-shell .associate-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+  min-width: 0;
+}
+
+.associate-shell .associate-account-actions .profile-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 9px !important;
+  min-height: 58px;
+  margin: 0 !important;
+  padding: 13px 20px !important;
+  border-radius: 11px !important;
+  background: #061a3d !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.2;
+}
+
+.associate-shell .associate-account-actions .exit {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  color: #586984 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  padding: 8px 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  cursor: pointer;
+}
+
+.associate-shell .associate-menu {
+  display: none;
+}
+
+@media (max-width: 1320px) and (min-width: 1051px) {
+  .associate-shell .member-topbar {
+    grid-template-columns: 220px minmax(440px, 1fr) 300px;
+    gap: 18px !important;
+    padding-inline: 22px !important;
+  }
+  .associate-shell .member-topbar > nav { gap: clamp(14px, 1.7vw, 22px) !important; }
+  .associate-shell .member-topbar > nav a { font-size: 11px !important; }
+  .associate-shell .member-topbar .brand img { width: 66px !important; height: 66px !important; flex-basis: 66px !important; }
+  .associate-shell .member-topbar .brand b { font-size: 14px !important; }
+  .associate-shell .associate-account-actions { gap: 14px; }
+  .associate-shell .associate-account-actions .profile-link { padding-inline: 14px !important; font-size: 10px !important; }
+}
+
+@media (max-width: 1050px) {
+  .associate-shell .member-topbar {
+    display: grid !important;
+    grid-template-columns: 1fr auto auto;
+    min-height: 82px !important;
+    height: auto !important;
+    gap: 12px !important;
+    padding: 10px 4vw !important;
+  }
+  .associate-shell .member-topbar .brand img { width: 58px !important; height: 58px !important; flex-basis: 58px !important; }
+  .associate-shell .member-topbar .brand b { font-size: 13px !important; }
+  .associate-shell .associate-menu { display: grid !important; place-items: center; }
+  .associate-shell .associate-account-actions .exit { display: none !important; }
+  .associate-shell .associate-account-actions .profile-link { min-height: 44px; padding: 10px 13px !important; font-size: 10px !important; }
+  .associate-shell .member-topbar > nav {
+    display: none !important;
+    grid-column: 1 / -1;
+    align-self: auto !important;
+    justify-content: flex-start !important;
+    gap: 25px !important;
+    padding: 9px 0 5px;
+    overflow-x: auto !important;
+  }
+  .associate-shell .member-topbar > nav.open { display: flex !important; }
+  .associate-shell .member-topbar > nav a { height: auto !important; padding: 8px 0 !important; white-space: nowrap; }
+}
+
+@media (max-width: 600px) {
+  .associate-shell .member-topbar { grid-template-columns: 1fr auto; }
+  .associate-shell .associate-account-actions { display: none; }
+  .associate-shell .member-topbar .brand span { font-size: 9px !important; }
+  .associate-shell .member-topbar .brand b { font-size: 11px !important; }
+}

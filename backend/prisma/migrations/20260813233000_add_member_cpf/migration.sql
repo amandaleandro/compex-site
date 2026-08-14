@@ -1,0 +1,3 @@
+ALTER TABLE "Member" ADD COLUMN IF NOT EXISTS "cpf" TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Member_cpf_key" ON "Member"("cpf");

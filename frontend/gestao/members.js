@@ -11,7 +11,7 @@ let allMembers = [];
 
 async function loadMembers() {
   const response = await fetch('/api/members', { headers: authHeaders() });
-  if (response.status === 401) { window.location.href = '/public/gestao-login.html'; return []; }
+  if (response.status === 401) { window.location.href = '/login'; return []; }
   if (!response.ok) return [];
   return response.json();
 }

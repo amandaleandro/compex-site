@@ -11,6 +11,7 @@ const { resolveSession, bearerToken, canManageAccounts } = require('../lib/sessi
 const { INTERNAL_ROLES } = require('../lib/constants');
 const { teamSlotWeight, chargeSessionParticipants, computeFinanceOverview } = require('../lib/finance');
 const { transactionCreateSchema, transactionUpdateSchema, validate, IMAGE_MIME_TYPES, NEWS_MEDIA_MIME_TYPES, isAllowedMime } = require('../lib/validation');
+const { normalizeCpf, isValidCpf } = require('../lib/cpf');
 
 function collection(name, req, res) {
   const data = readData();
@@ -328,11 +329,30 @@ async function databaseCollection(name, req, res, url) {
       })));
     }
     if (req.method === 'POST') return body(req).then(async item => {
+      const name = String(item.name || '').trim();
+      const email = String(item.email || '').trim().toLowerCase();
+      const registration = String(item.registration || '').trim();
+      const cpf = normalizeCpf(item.cpf);
+      if (!name || !email || !item.password || !item.course || !registration || !cpf) {
+        return send(res, 400, { error: 'Preencha nome, e-mail, curso, matrícula, CPF e senha.' });
+      }
+      if (!isValidCpf(cpf)) return send(res, 400, { error: 'Informe um CPF válido.' });
+      if (String(item.password).length < 8) return send(res, 400, { error: 'A senha deve ter pelo menos 8 caracteres.' });
+      const [emailInUse, registrationInUse, cpfInUse] = await Promise.all([
+        prisma.user.findUnique({ where: { email }, select: { id: true } }),
+        prisma.member.findUnique({ where: { registration }, select: { id: true } }),
+        prisma.member.findUnique({ where: { cpf }, select: { id: true } }),
+      ]);
+      if (emailInUse) return send(res, 409, { error: 'Este e-mail já possui uma conta. Entre no portal ou use outro e-mail.' });
+      if (registrationInUse) return send(res, 409, { error: 'Esta matrícula já está vinculada a uma conta.' });
+      if (cpfInUse) return send(res, 409, { error: 'Este CPF já está vinculado a uma conta.' });
       const referrer = item.referralCode ? await prisma.member.findUnique({ where: { referralCode: item.referralCode } }) : null;
       const isAvulso = item.membershipKind === 'AVULSO';
-      const hashed = await bcrypt.hash(item.password || crypto.randomBytes(6).toString('hex'), 10);
-      const user = await prisma.user.create({ data: { name: item.name, email: item.email, password: hashed, role: 'ASSOCIADO', member: { create: {
-        course: item.course, plan: isAvulso ? 'Avulso' : (item.plan || 'Anual'), sex: item.sex || null, birthDate: item.birthDate ? new Date(item.birthDate) : null,
+      const hashed = await bcrypt.hash(String(item.password), 10);
+      const user = await prisma.user.create({ data: { name, email, password: hashed, role: 'ASSOCIADO', member: { create: {
+        course: item.course, registration, cpf, socialName: String(item.socialName || '').trim() || null, nickname: String(item.nickname || '').trim() || null,
+        plan: isAvulso ? 'Avulso' : (item.plan || 'Anual'), sex: item.sex || null, birthDate: item.birthDate ? new Date(item.birthDate) : null,
+        phone: item.phone || null,
         memberType: item.memberType === 'ATLETA' ? 'ATLETA' : 'TORCEDOR', selectedSports: Array.isArray(item.selectedSports) ? item.selectedSports : [],
         membershipKind: isAvulso ? 'AVULSO' : 'SOCIO',
         status: isAvulso ? 'ACTIVE' : (item.status === 'active' ? 'ACTIVE' : 'PENDING'),
@@ -484,6 +504,34 @@ async function databaseCollection(name, req, res, url) {
       send(res, 200, mapSession(updated));
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.teamSession.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+  }
+  if (name === 'session-attendances') {
+    const session = resolveSession(bearerToken(req));
+    if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
+    const mapAttendance = a => ({ id: a.id, sessionId: a.sessionId, memberId: a.memberId, memberName: a.member.user.name, status: a.status, createdAt: a.createdAt.toISOString(), respondedAt: a.respondedAt ? a.respondedAt.toISOString() : null });
+    if (req.method === 'GET') {
+      const sessionId = new URL(req.url, 'http://internal').searchParams.get('sessionId');
+      if (!sessionId) return send(res, 400, { error: 'Informe o treino/jogo.' });
+      const attendances = await prisma.sessionAttendance.findMany({ where: { sessionId }, include: { member: { include: { user: true } } }, orderBy: { createdAt: 'desc' } });
+      return send(res, 200, attendances.map(mapAttendance));
+    }
+    if (req.method === 'POST') return body(req).then(async item => {
+      if (!item.sessionId || !item.memberId) return send(res, 400, { error: 'Informe o treino/jogo e o sócio.' });
+      const [teamSession, enrollment] = await Promise.all([
+        prisma.teamSession.findUnique({ where: { id: item.sessionId } }),
+        prisma.teamEnrollment.findFirst({ where: { memberId: item.memberId, status: 'APPROVED' } }),
+      ]);
+      if (!teamSession) return send(res, 404, { error: 'Treino/jogo não encontrado.' });
+      if (!enrollment) return send(res, 400, { error: 'Este sócio não está vinculado a nenhuma modalidade aprovada.' });
+      const created = await prisma.sessionAttendance.upsert({
+        where: { sessionId_memberId: { sessionId: item.sessionId, memberId: item.memberId } },
+        update: {},
+        create: { sessionId: item.sessionId, memberId: item.memberId, status: 'PENDING' },
+        include: { member: { include: { user: true } } },
+      });
+      send(res, 201, mapAttendance(created));
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.sessionAttendance.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
   }
   if (name === 'tasks') {
     if (req.method === 'GET') return send(res, 200, (await prisma.task.findMany({ orderBy: { createdAt: 'desc' } })).map(t => ({

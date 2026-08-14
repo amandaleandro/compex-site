@@ -1,0 +1,3 @@
+import { Copy, Share2 } from "lucide-react";
+import AssociatePage from "@/components/associate/AssociatePage";
+export default function IndicarPage(){return <AssociatePage eyebrow="COMUNIDADE" title="Indicar um amigo" description="Convide mais pessoas para fazer parte da CompExatas."><div className="mt-6 max-w-xl rounded-xl bg-blue-50 p-6"><span className="text-xs font-bold text-slate-500">Seu código de indicação</span><div className="mt-3 flex items-center justify-between rounded-lg border border-blue-200 bg-white p-4"><b className="text-xl tracking-widest text-blue-800">AMANDA2026</b><Copy className="text-blue-700" size={19}/></div><button className="associate-button mt-5"><Share2 size={16}/> Compartilhar convite</button></div></AssociatePage>}

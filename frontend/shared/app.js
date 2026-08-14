@@ -8,4 +8,4 @@ modal.addEventListener('click', (event) => { if (event.target === modal) closeMo
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
 document.querySelector('.menu-button').addEventListener('click', () => document.querySelector('.nav').classList.toggle('mobile-open'));
 const loginButton = document.querySelector('.modal .full');
-loginButton.addEventListener('click', (event) => { event.preventDefault(); window.location.href = '/public/login.html'; });
+loginButton.addEventListener('click', (event) => { event.preventDefault(); window.location.href = '/login'; });

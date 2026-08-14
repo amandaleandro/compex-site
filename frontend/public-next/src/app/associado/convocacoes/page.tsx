@@ -1,0 +1,3 @@
+import { FileText } from "lucide-react";
+import AssociatePage from "@/components/associate/AssociatePage";
+export default function ConvocacoesPage(){return <AssociatePage eyebrow="COMUNIDADE" title="Convocações" description="Assembleias, reuniões e comunicados para associados."><div className="associate-list"><div className="associate-list-item"><div><b>Assembleia Geral de Atletas</b><small>05 NOV · Auditório Exatas · 18h30</small></div><FileText className="text-blue-700" size={20}/></div><div className="associate-list-item"><div><b>Reunião de representantes</b><small>Calendário de jogos e treinos da temporada</small></div><FileText className="text-blue-700" size={20}/></div></div></AssociatePage>}

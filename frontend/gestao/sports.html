@@ -136,6 +136,22 @@
     <div class="modal-actions"><button type="button" class="btn btn-ghost" id="close-sessions">Fechar</button></div>
   </div>
 </div>
+
+<div class="modal-backdrop" id="convocation-modal">
+  <div class="modal" style="width:min(94vw,560px)">
+    <h2 id="convocation-title">Convocação</h2>
+    <p class="modal-sub">Selecione quem foi chamado para este treino/jogo. O sócio confirma ou recusa presença pelo portal dele.</p>
+    <div class="field">
+      <label>Buscar atleta vinculado à modalidade</label>
+      <input type="search" id="convocation-search" placeholder="Digite para buscar…">
+    </div>
+    <div id="convocation-candidates" style="max-height:180px;overflow-y:auto;margin-bottom:14px"></div>
+    <hr class="hairline">
+    <p class="rank-heading">Convocados</p>
+    <div id="convocation-list" style="max-height:220px;overflow-y:auto"></div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" id="close-convocation">Fechar</button></div>
+  </div>
+</div>
 <script src="/gestao/sports.js"></script>
 </body>
 </html>

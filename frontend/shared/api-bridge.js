@@ -1,6 +1,11 @@
 (async function () {
-  const resources = { '/public/events-public.html': 'events', '/public/news.html': 'news' };
-  const page = location.pathname.split('/').pop() || '/public/index.html';
+  const resources = {
+    '/eventos': 'events',
+    '/noticias': 'news',
+    '/public/events-public.html': 'events',
+    '/public/news.html': 'news'
+  };
+  const page = location.pathname;
   const resource = resources[page];
   if (!resource || !window.fetch) return;
   const originalSetItem = Storage.prototype.setItem;

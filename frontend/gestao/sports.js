@@ -170,10 +170,12 @@ async function renderSessions() {
         <b>${new Date(s.date).toLocaleDateString('pt-BR')}</b>
         <small>${s.location || 'Local a definir'}${s.coachName ? ' · treinador: ' + s.coachName : ''}${s.coachCost ? ' · ' + money(s.coachCost) : ''}${s.refereeCost ? ' · juiz: ' + money(s.refereeCost) : ''}</small>
       </div>
+      <button type="button" class="btn btn-ghost btn-sm open-convocation" data-id="${s.id}" data-date="${new Date(s.date).toLocaleDateString('pt-BR')}" data-type="${sessionTypeLabel[s.type]}">Convocar</button>
       <button type="button" class="btn btn-ghost btn-sm edit-session" data-id="${s.id}">Editar</button>
       <button type="button" class="remove-session" data-id="${s.id}">×</button>
     </div>`).join('') || '<p class="empty-state">Nenhum treino ou jogo registrado ainda.</p>';
 
+  document.querySelectorAll('.open-convocation').forEach(btn => btn.onclick = () => openConvocation(btn.dataset.id, btn.dataset.type, btn.dataset.date));
   document.querySelectorAll('.remove-session').forEach(btn => btn.onclick = async () => {
     await fetch('/api/team-sessions', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ id: btn.dataset.id }) });
     renderSessions();
@@ -244,6 +246,67 @@ sessionsForm.onsubmit = async event => {
 };
 
 renderModalities();
+
+/* ---------- Convocação (quem foi chamado para o treino/jogo) ---------- */
+const convocationModal = document.querySelector('#convocation-modal');
+const convocationSearch = document.querySelector('#convocation-search');
+const convocationCandidates = document.querySelector('#convocation-candidates');
+const convocationList = document.querySelector('#convocation-list');
+const attendanceStatusLabel = { PENDING: 'Aguardando resposta', CONFIRMED: 'Confirmado', DECLINED: 'Recusou' };
+const attendanceStatusBadge = { PENDING: 'badge-neutral', CONFIRMED: 'badge-active', DECLINED: 'badge-danger' };
+let activeSessionId = null;
+
+async function loadTeamAthletes() {
+  const response = await fetch(`/api/member-athletes?teamId=${encodeURIComponent(activeModalityId)}`, { headers: authHeaders() });
+  return response.ok ? response.json() : [];
+}
+
+async function loadConvocations() {
+  const response = await fetch(`/api/session-attendances?sessionId=${encodeURIComponent(activeSessionId)}`, { headers: authHeaders() });
+  return response.ok ? response.json() : [];
+}
+
+async function renderConvocation() {
+  const [athletes, convocations] = await Promise.all([loadTeamAthletes(), loadConvocations()]);
+  const convokedIds = new Set(convocations.map(c => c.memberId));
+  const query = convocationSearch.value.trim().toLowerCase();
+  const candidates = athletes.filter(m => !convokedIds.has(m.id) && (!query || m.name.toLowerCase().includes(query)));
+
+  convocationCandidates.innerHTML = candidates.map(m => `
+    <div class="modality-row">
+      <div><b>${m.name}</b><small>${m.course}</small></div>
+      <button type="button" class="btn btn-ghost btn-sm add-convocation" data-id="${m.id}">+ Convocar</button>
+    </div>`).join('') || '<p class="empty-state">Nenhum atleta vinculado disponível.</p>';
+
+  convocationList.innerHTML = convocations.map(c => `
+    <div class="modality-row">
+      <div><b>${c.memberName}</b></div>
+      <span class="badge ${attendanceStatusBadge[c.status]}">${attendanceStatusLabel[c.status]}</span>
+      <button type="button" class="remove-convocation" data-id="${c.id}">×</button>
+    </div>`).join('') || '<p class="empty-state">Ninguém convocado ainda.</p>';
+
+  document.querySelectorAll('.add-convocation').forEach(btn => btn.onclick = async () => {
+    const response = await fetch('/api/session-attendances', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ sessionId: activeSessionId, memberId: btn.dataset.id }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) { alert(result.error || 'Não foi possível convocar.'); return; }
+    renderConvocation();
+  });
+  document.querySelectorAll('.remove-convocation').forEach(btn => btn.onclick = async () => {
+    await fetch('/api/session-attendances', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ id: btn.dataset.id }) });
+    renderConvocation();
+  });
+}
+convocationSearch.oninput = renderConvocation;
+
+function openConvocation(sessionId, typeLabel, dateLabel) {
+  activeSessionId = sessionId;
+  document.querySelector('#convocation-title').textContent = `Convocação — ${typeLabel} em ${dateLabel}`;
+  convocationSearch.value = '';
+  renderConvocation();
+  convocationModal.classList.add('open');
+}
+document.querySelector('#close-convocation').onclick = () => convocationModal.classList.remove('open');
+convocationModal.onclick = event => { if (event.target === convocationModal) convocationModal.classList.remove('open'); };
 
 /* ---------- Atletas da modalidade (vínculo com sócios) ---------- */
 const teamAthletesModal = document.querySelector('#team-athletes-modal');

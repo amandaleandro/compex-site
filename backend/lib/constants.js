@@ -32,7 +32,7 @@ const PAGE_ROLES = {
   'members.html': new Set(['PRESIDENCIA', 'FINANCEIRO', 'ESPORTES']),
   'sports.html': new Set(['PRESIDENCIA', 'ESPORTES']),
   'event-manager.html': new Set(['PRESIDENCIA', 'EVENTOS']),
-  'checkin.html': new Set(['PRESIDENCIA', 'EVENTOS']),
+  'checkin.html': new Set(['PRESIDENCIA', 'EVENTOS', 'ESPORTES']),
   'communication.html': new Set(['PRESIDENCIA', 'MARKETING']),
   'produtos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),
   'pedidos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),

@@ -73,7 +73,7 @@ boardForm.onsubmit = async event => {
       document.querySelector('#metric-balance').closest('.grid').style.gridTemplateColumns = 'repeat(3, 1fr)';
     }
   } catch {
-    window.location.href = '/public/gestao-login.html';
+    window.location.href = '/login';
     return;
   }
 

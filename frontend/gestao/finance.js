@@ -12,7 +12,7 @@ let allMonths = [];
 
 async function loadOverview() {
   const response = await fetch('/api/finance-overview', { headers: authHeaders() });
-  if (response.status === 401) { window.location.href = '/public/gestao-login.html'; return { entries: [], months: [] }; }
+  if (response.status === 401) { window.location.href = '/login'; return { entries: [], months: [] }; }
   if (!response.ok) return { entries: [], months: [] };
   return response.json();
 }

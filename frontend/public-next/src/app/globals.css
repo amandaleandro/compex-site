@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-page: #f2f4f7;
+    --navy-blue: #0b2265;
+    --navy-dark: #071745;
+    --accent-blue: #2563eb;
+    --accent-lime: #e5e7eb;
+    --text-dark: #1e293b;
+    --text-slate: #64748b;
+    --card-bg: #ffffff;
+    --border-light: #e2e8f0;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-dark);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+}
+
+.bg-navy-main {
+  background-color: var(--navy-blue);
+}
+
+.bg-navy-dark {
+  background-color: var(--navy-dark);
+}
+
+.text-navy {
+  color: var(--navy-blue);
+}
+
+.bg-lime-accent {
+  background-color: var(--accent-lime);
+}
+
+.text-lime-accent {
+  color: #64748b;
+}
+
+.compex-card {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 20px -2px rgba(11, 34, 101, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.compex-card:hover {
+  box-shadow: 0 10px 25px -4px rgba(11, 34, 101, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Base visual shared with the existing HTML portal: light canvas, compact cards,
+   navy header/hero and restrained blue actions. */
+body { color: #101a2f; }
+.login-page .login-header,.login-page .login-footer{padding-left:0!important;padding-right:0!important}
+.associate-footer{padding-left:0!important;padding-right:0!important}
+.associate-shell .member-topbar{padding-left:0!important;padding-right:0!important}
+.site-header { background: #fff; border-bottom: 1px solid #d7dce5; }
+.hero, .event-hero, .benefits, .transparency, .perks, .values, .intro { color: #fff; }

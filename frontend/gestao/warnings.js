@@ -78,7 +78,7 @@ document.querySelector('#warning-form').onsubmit = async event => {
 
 (async function () {
   const me = await loadMe();
-  if (!me) { window.location.href = '/public/gestao-login.html'; return; }
+  if (!me) { window.location.href = '/login'; return; }
   directors = await loadDirectors();
   await refresh();
 })();

@@ -1,0 +1,128 @@
+.reg-page {
+  width: min(calc(100% - 40px), 1180px);
+  margin: 0 auto;
+  padding: 30px 0 70px;
+  color: #10244b;
+}
+.reg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 16px;
+  color: #31537f;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.reg-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  min-height: 300px;
+  align-items: center;
+  overflow: hidden;
+  padding: 44px 54px;
+  border-radius: 24px;
+  background: linear-gradient(125deg, #031630, #0a3474 64%, #155bea);
+  color: #fff;
+  box-shadow: 0 24px 55px #102c6824;
+}
+.reg-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(125deg, transparent 0 88px, #4c8cff13 90px 97px, transparent 99px 150px);
+}
+.reg-hero > img {
+  position: absolute;
+  right: 20%;
+  width: 330px;
+  opacity: 0.1;
+  transform: rotate(-7deg);
+}
+.reg-hero > div { position: relative; z-index: 1; }
+.reg-hero p, .reg-heading p {
+  margin: 0;
+  color: #6ea4ff;
+  font: 800 9px "DM Mono", monospace;
+  letter-spacing: 0.17em;
+}
+.reg-hero h1 {
+  margin: 15px 0 17px;
+  font-size: clamp(47px, 5.3vw, 68px);
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+}
+.reg-hero h1 em { color: #4c89ff; font-style: normal; }
+.reg-hero div > span { display: block; max-width: 610px; color: #cfdbed; font-size: 12px; line-height: 1.7; }
+.reg-hero-seal {
+  display: flex;
+  min-height: 170px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff30;
+  border-radius: 18px;
+  background: #061b3fa8;
+  backdrop-filter: blur(7px);
+}
+.reg-hero-seal svg { width: 38px; height: 38px; margin-bottom: 12px; color: #62a0ff; }
+.reg-hero-seal b { font-size: 15px; }
+.reg-hero-seal small { margin-top: 5px; color: #91b4eb; font-size: 9px; }
+.reg-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0 42px; }
+.reg-summary article { display: flex; align-items: center; gap: 13px; padding: 18px; border: 1px solid #dce6f2; border-radius: 14px; background: #fff; }
+.reg-summary svg { width: 40px; height: 40px; padding: 10px; border-radius: 10px; background: #eaf2ff; color: #155bea; }
+.reg-summary b, .reg-summary span { display: block; }
+.reg-summary b { font-size: 11px; }
+.reg-summary span { margin-top: 4px; color: #75859a; font-size: 9px; line-height: 1.45; }
+.reg-section { margin-top: 42px; }
+.reg-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 17px; }
+.reg-heading > span { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 12px; background: #071b3e; color: #fff; font-size: 11px; font-weight: 900; }
+.reg-heading h2 { margin: 5px 0 0; font-size: 28px; letter-spacing: -0.04em; }
+.reg-earn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; }
+.reg-earn-grid article { min-height: 215px; padding: 20px; border: 1px solid #dce6f2; border-radius: 15px; background: #fff; }
+.reg-earn-grid svg { width: 42px; height: 42px; padding: 10px; border-radius: 11px; background: #eaf2ff; color: #155bea; }
+.reg-earn-grid strong { display: block; margin-top: 18px; color: #155bea; font-size: 10px; }
+.reg-earn-grid h3 { margin: 7px 0 8px; font-size: 13px; }
+.reg-earn-grid p, .reg-deduction-list p { margin: 0; color: #718096; font-size: 9px; line-height: 1.55; }
+.reg-deduction-list { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.reg-deduction-list article { display: grid; grid-template-columns: 38px 1fr 20px; align-items: center; gap: 13px; padding: 18px; border: 1px solid #eadedc; border-radius: 14px; background: #fff; }
+.reg-deduction-list article > span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: #fff0ed; color: #b84e43; font-size: 10px; font-weight: 900; }
+.reg-deduction-list h3 { margin: 0 0 5px; font-size: 12px; }
+.reg-deduction-list svg { color: #d17a6f; }
+.reg-notice { display: flex; align-items: center; gap: 13px; margin-top: 12px; padding: 16px 19px; border: 1px solid #a9c8f5; border-radius: 13px; background: #eff6ff; color: #45617f; }
+.reg-notice svg { flex: none; color: #155bea; }
+.reg-notice p { margin: 0; font-size: 10px; line-height: 1.6; }
+.reg-notice b { color: #10244b; }
+.reg-levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+.reg-levels article { min-height: 190px; padding: 20px; border: 1px solid #dce6f2; border-radius: 15px; background: #fff; }
+.reg-levels article > div { display: flex; align-items: center; justify-content: space-between; color: #155bea; }
+.reg-levels article > div span { font-size: 27px; font-weight: 900; opacity: 0.15; }
+.reg-levels article > p { margin: 22px 0 5px; color: #155bea; font-size: 9px; font-weight: 900; }
+.reg-levels h3 { margin: 0 0 9px; font-size: 16px; }
+.reg-levels article > span { color: #718096; font-size: 9px; line-height: 1.55; }
+.reg-terms { display: grid; grid-template-columns: 250px 1fr; gap: 35px; margin-top: 44px; padding: 30px 34px; border-radius: 19px; background: #071b3e; color: #fff; }
+.reg-terms > div svg { color: #5793ff; }
+.reg-terms h2 { margin: 12px 0 0; font-size: 27px; letter-spacing: -0.04em; }
+.reg-terms ul { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.reg-terms li { display: flex; align-items: flex-start; gap: 8px; color: #c4d2e6; font-size: 10px; line-height: 1.5; }
+.reg-terms li svg { flex: none; color: #5ee0b8; }
+.reg-terms > a { grid-column: 2; display: inline-flex; width: max-content; align-items: center; gap: 7px; padding: 11px 15px; border-radius: 9px; background: #1762ef; color: #fff; font-size: 10px; font-weight: 800; text-decoration: none; }
+@media (max-width: 950px) {
+  .reg-earn-grid { grid-template-columns: repeat(3, 1fr); }
+  .reg-levels { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  .reg-page { width: min(calc(100% - 24px), 1180px); padding-top: 20px; }
+  .reg-hero { grid-template-columns: 1fr; padding: 35px 25px; }
+  .reg-hero-seal { width: 210px; min-height: 130px; margin-top: 24px; }
+  .reg-summary, .reg-deduction-list { grid-template-columns: 1fr; }
+  .reg-earn-grid { grid-template-columns: 1fr 1fr; }
+  .reg-terms { grid-template-columns: 1fr; padding: 25px; }
+  .reg-terms > a { grid-column: 1; }
+  .reg-hero h1 { font-size: 45px; }
+}
+@media (max-width: 460px) {
+  .reg-earn-grid, .reg-levels { grid-template-columns: 1fr; }
+  .reg-heading h2 { font-size: 23px; }
+}

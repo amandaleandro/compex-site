@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider     = "prisma-client-js"
+  output       = "../generated/prisma"
   moduleFormat = "cjs"
 }
 
@@ -36,17 +36,17 @@ enum Rank {
 }
 
 model User {
-  id        String    @id @default(cuid())
+  id        String            @id @default(cuid())
   name      String
-  email     String    @unique
+  email     String            @unique
   password  String
-  role      Role      @default(ASSOCIADO)
-  rank      Rank      @default(DIRETOR)
+  role      Role              @default(ASSOCIADO)
+  rank      Rank              @default(DIRETOR)
   birthDate DateTime?
   member    Member?
   warnings  DirectorWarning[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 enum WarningType {
@@ -65,29 +65,33 @@ model DirectorWarning {
 }
 
 model Member {
-  id           String   @id @default(cuid())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String   @unique
-  course       String
-  plan         String
-  sportSlots   Int      @default(1)
-  membershipKind String @default("SOCIO")
-  status       Status   @default(PENDING)
-  registration String?  @unique
-  socialName   String?
-  nickname     String?
-  sex          String?
-  birthDate    DateTime?
-  photoUrl     String?
-  memberType   String   @default("TORCEDOR")
+  id             String    @id @default(cuid())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String    @unique
+  course         String
+  plan           String
+  sportSlots     Int       @default(1)
+  membershipKind String    @default("SOCIO")
+  status         Status    @default(PENDING)
+  registration   String?   @unique
+  cpf            String?   @unique
+  socialName     String?
+  nickname       String?
+  sex            String?
+  birthDate      DateTime?
+  photoUrl       String?
+  memberType     String    @default("TORCEDOR")
   selectedSports Json?
-  shirtSize    String?
-  instagram    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  shirtSize      String?
+  instagram      String?
+  phone          String?
+  shift          String?
+  preferences    Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  mpPayerId          String?    @unique
-  mpPreapprovalId    String?    @unique
+  mpPayerId          String?   @unique
+  mpPreapprovalId    String?   @unique
   subscriptionStatus String?
   currentPeriodEnd   DateTime?
 
@@ -96,13 +100,14 @@ model Member {
   referredById String?
   referrals    Member[] @relation("Referrals")
 
-  teamEnrollments   TeamEnrollment[]
-  orders            Order[]
-  pointsEntries     PointsEntry[]
-  checkIns          EventCheckIn[]
-  sessionCharges    SessionCharge[]
+  teamEnrollments    TeamEnrollment[]
+  orders             Order[]
+  pointsEntries      PointsEntry[]
+  checkIns           EventCheckIn[]
+  sessionCharges     SessionCharge[]
   sessionAttendances SessionAttendance[]
-  socialSubmissions SocialSubmission[]
+  trainingCheckIns   TrainingCheckIn[]
+  socialSubmissions  SocialSubmission[]
 }
 
 enum Gender {
@@ -117,18 +122,18 @@ enum TeamSessionType {
 }
 
 model Team {
-  id                String           @id @default(cuid())
-  name              String
-  sport             String
-  gender            Gender           @default(MISTA)
-  description       String?
-  trainingDay       String?
-  active            Boolean          @default(true)
-  dropInPriceCents  Int?
-  createdAt         DateTime         @default(now())
-  enrollments       TeamEnrollment[]
-  sessions          TeamSession[]
-  coaches           Coach[]
+  id               String           @id @default(cuid())
+  name             String
+  sport            String
+  gender           Gender           @default(MISTA)
+  description      String?
+  trainingDay      String?
+  active           Boolean          @default(true)
+  dropInPriceCents Int?
+  createdAt        DateTime         @default(now())
+  enrollments      TeamEnrollment[]
+  sessions         TeamSession[]
+  coaches          Coach[]
 }
 
 enum EnrollmentStatus {
@@ -150,21 +155,22 @@ model TeamEnrollment {
 }
 
 model TeamSession {
-  id         String          @id @default(cuid())
-  team       Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  teamId     String
-  type       TeamSessionType
-  date       DateTime
-  location   String?
-  coachName  String?
-  coachCost  Decimal?        @db.Decimal(10, 2)
-  refereeName String?
+  id            String              @id @default(cuid())
+  team          Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId        String
+  type          TeamSessionType
+  date          DateTime
+  location      String?
+  coachName     String?
+  coachCost     Decimal?            @db.Decimal(10, 2)
+  refereeName   String?
   refereePixKey String?
-  refereeCost Decimal?       @db.Decimal(10, 2)
-  notes      String?
-  createdAt  DateTime        @default(now())
-  charges    SessionCharge[]
-  attendances SessionAttendance[]
+  refereeCost   Decimal?            @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime            @default(now())
+  charges       SessionCharge[]
+  attendances   SessionAttendance[]
+  checkIns      TrainingCheckIn[]
 }
 
 enum SessionChargeStatus {
@@ -174,18 +180,18 @@ enum SessionChargeStatus {
 }
 
 model SessionCharge {
-  id            String              @id @default(cuid())
-  session       TeamSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId     String
-  member        Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  memberId      String
-  amountCents   Int
-  breakdown     String?
-  status        SessionChargeStatus @default(PENDING)
-  mpPaymentId   String?
-  pixQrCode     String?
-  pixQrBase64   String?
-  createdAt     DateTime            @default(now())
+  id          String              @id @default(cuid())
+  session     TeamSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  member      Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId    String
+  amountCents Int
+  breakdown   String?
+  status      SessionChargeStatus @default(PENDING)
+  mpPaymentId String?
+  pixQrCode   String?
+  pixQrBase64 String?
+  createdAt   DateTime            @default(now())
 }
 
 enum AttendanceStatus {
@@ -195,14 +201,27 @@ enum AttendanceStatus {
 }
 
 model SessionAttendance {
-  id        String           @id @default(cuid())
-  session   TeamSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String
-  member    Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  memberId  String
-  status    AttendanceStatus @default(PENDING)
-  createdAt DateTime         @default(now())
+  id          String           @id @default(cuid())
+  session     TeamSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  member      Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId    String
+  status      AttendanceStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
   respondedAt DateTime?
+
+  @@unique([sessionId, memberId])
+}
+
+model TrainingCheckIn {
+  id             String      @id @default(cuid())
+  session        TeamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId      String
+  member         Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId       String
+  checkedByEmail String
+  checkedByName  String
+  createdAt      DateTime    @default(now())
 
   @@unique([sessionId, memberId])
 }
@@ -253,9 +272,9 @@ model AssetLoan {
   expectedReturn   DateTime?
   returnDate       DateTime?
   status           LoanStatus @default(EMPRESTADO)
-  signatureData    String?    // Guarda a assinatura digital em Base64 PNG ou Hash do aceite
+  signatureData    String? // Guarda a assinatura digital em Base64 PNG ou Hash do aceite
   acceptedTerms    Boolean    @default(true)
-  termDocumentUrl  String?    // Caminho do comprovante/PDF/JSON em uploads/patrimonio
+  termDocumentUrl  String? // Caminho do comprovante/PDF/JSON em uploads/patrimonio
   notes            String?
   createdAt        DateTime   @default(now())
 }
@@ -275,14 +294,14 @@ model Asset {
 }
 
 model Coach {
-  id               String   @id @default(cuid())
-  name             String
-  hourlyRateCents  Int
-  pixKey           String?
-  notes            String?
-  team             Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  teamId           String?
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String
+  hourlyRateCents Int
+  pixKey          String?
+  notes           String?
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamId          String?
+  createdAt       DateTime @default(now())
 }
 
 enum OrderStatus {
@@ -295,19 +314,19 @@ enum OrderStatus {
 }
 
 model Order {
-  id              String      @id @default(cuid())
-  member          Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  memberId        String
-  status          OrderStatus @default(PENDING)
-  totalCents      Int
+  id                String      @id @default(cuid())
+  member            Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId          String
+  status            OrderStatus @default(PENDING)
+  totalCents        Int
   estimatedDelivery DateTime?
-  notifiedAt      DateTime?
-  deliveredAt     DateTime?
-  deliveredBy     String?
-  mpPreferenceId  String?     @unique
-  mpPaymentId     String?
-  createdAt       DateTime    @default(now())
-  items           OrderItem[]
+  notifiedAt        DateTime?
+  deliveredAt       DateTime?
+  deliveredBy       String?
+  mpPreferenceId    String?     @unique
+  mpPaymentId       String?
+  createdAt         DateTime    @default(now())
+  items             OrderItem[]
 }
 
 model OrderItem {
@@ -386,14 +405,14 @@ model Document {
 }
 
 model Poll {
-  id          String     @id @default(cuid())
-  question    String
-  options     Json
-  closed      Boolean    @default(false)
-  expiresAt   DateTime?
-  createdBy   String?
-  createdAt   DateTime   @default(now())
-  votes       PollVote[]
+  id        String     @id @default(cuid())
+  question  String
+  options   Json
+  closed    Boolean    @default(false)
+  expiresAt DateTime?
+  createdBy String?
+  createdAt DateTime   @default(now())
+  votes     PollVote[]
 }
 
 model PollVote {
@@ -426,19 +445,19 @@ model Task {
 }
 
 model Sponsor {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   company          String
   contact          String
   value            String?
-  status           String   @default("Negociando")
-  delivery         String   @default("—")
-  category         String   @default("PATROCINIO") // PATROCINIO ou PARCERIA
+  status           String    @default("Negociando")
+  delivery         String    @default("—")
+  category         String    @default("PATROCINIO") // PATROCINIO ou PARCERIA
   responsibleName  String?
   responsibleEmail String?
   startDate        DateTime?
   endDate          DateTime?
   notes            String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 }
 
 model BoardPost {
@@ -456,16 +475,17 @@ enum PointsReason {
   TREINO_PRESENCA
   COMPRA_LOJA
   ENGAJAMENTO_SOCIAL
+  AJUSTE_ADMINISTRATIVO
 }
 
 model PointsEntry {
-  id       String       @id @default(cuid())
-  member   Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  memberId String
-  reason   PointsReason
-  points   Int
-  note     String?
-  createdAt DateTime    @default(now())
+  id        String       @id @default(cuid())
+  member    Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  reason    PointsReason
+  points    Int
+  note      String?
+  createdAt DateTime     @default(now())
 }
 
 model EventCheckIn {
@@ -526,17 +546,17 @@ enum ChampionshipStatus {
 }
 
 model Championship {
-  id         String              @id @default(cuid())
-  name       String
-  sport      String
-  season     String?
-  status     ChampionshipStatus  @default(EM_ANDAMENTO)
-  placement  String?
-  isTitle    Boolean             @default(false)
-  notes      String?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  games      ChampionshipGame[]
+  id        String             @id @default(cuid())
+  name      String
+  sport     String
+  season    String?
+  status    ChampionshipStatus @default(EM_ANDAMENTO)
+  placement String?
+  isTitle   Boolean            @default(false)
+  notes     String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  games     ChampionshipGame[]
 }
 
 enum ChampionshipGameStatus {
@@ -545,16 +565,16 @@ enum ChampionshipGameStatus {
 }
 
 model ChampionshipGame {
-  id              String                  @id @default(cuid())
-  championship    Championship            @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  id              String                 @id @default(cuid())
+  championship    Championship           @relation(fields: [championshipId], references: [id], onDelete: Cascade)
   championshipId  String
   opponentName    String
   opponentLogoUrl String?
   date            DateTime
   location        String?
-  status          ChampionshipGameStatus  @default(AGENDADO)
+  status          ChampionshipGameStatus @default(AGENDADO)
   ourScore        Int?
   opponentScore   Int?
   notes           String?
-  createdAt       DateTime                @default(now())
+  createdAt       DateTime               @default(now())
 }

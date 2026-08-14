@@ -154,6 +154,6 @@ document.querySelector('#director-form').onsubmit = async event => {
 
 (async function () {
   me = await loadMe();
-  if (!me) { window.location.href = '/public/gestao-login.html'; return; }
+  if (!me) { window.location.href = '/login'; return; }
   await refresh();
 })();

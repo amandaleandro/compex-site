@@ -9,6 +9,7 @@ const { resolveSession, bearerToken, canManageAccounts, sessions, persistSession
 const { SESSION_TTL_MS, LEGACY_TOKENS, INTERNAL_ROLES, uploadsDir, associatePhotosDir } = require('../lib/constants');
 const { computeFinanceOverview } = require('../lib/finance');
 const { loginSchema, validate, DOCUMENT_MIME_TYPES, IMAGE_MIME_TYPES, isAllowedMime } = require('../lib/validation');
+const { awardPoints } = require('../lib/gamification');
 
 // Trata as rotas de autenticação, diretoria/advertências, enquetes, mural, check-ins,
 // stats/dashboard e uploads de documentos/foto de perfil. Retorna `true` quando a rota
@@ -346,6 +347,25 @@ async function handleGestaoRoutes(url, req, res) {
     await body(req).then(async item => { await prisma.boardPost.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     return true;
   }
+  if (url.pathname === '/api/gamification/points' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    const allowedReasons = new Set(['MENSALIDADE_EM_DIA', 'EVENTO_PRESENCA', 'TREINO_INSCRICAO', 'COMPRA_LOJA', 'ENGAJAMENTO_SOCIAL', 'AJUSTE_ADMINISTRATIVO']);
+    await body(req).then(async item => {
+      const points = Number(item.points);
+      const validAmount = item.reason === 'AJUSTE_ADMINISTRATIVO'
+        ? Number.isInteger(points) && points !== 0 && points >= -1000 && points <= 1000
+        : Number.isInteger(points) && points >= 1 && points <= 1000;
+      if (!item.memberId || !allowedReasons.has(item.reason) || !validAmount || !String(item.note || '').trim()) {
+        return send(res, 400, { error: 'Informe sócio, motivo, pontos e descrição válidos.' });
+      }
+      const entry = await awardPoints(item.memberId, item.reason, points, String(item.note).trim());
+      if (!entry) return send(res, 400, { error: 'A pontuação é exclusiva para sócios.' });
+      send(res, 201, entry);
+    }).catch(error => { console.error('[gamificação]', error); return send(res, 400, { error: 'Não foi possível creditar os pontos.' }); });
+    return true;
+  }
   if (url.pathname === '/api/checkins' && req.method === 'GET') {
     const session = internalSession(req);
     if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
@@ -372,13 +392,70 @@ async function handleGestaoRoutes(url, req, res) {
     await body(req).then(async item => {
       if (!item.eventId) return send(res, 400, { error: 'Nenhum evento ativo' });
       const code = (item.code || '').trim();
-      const member = await prisma.member.findFirst({ where: { OR: [{ registration: code }, { id: code }] }, include: { user: true } });
+      const qrParts = code.split(':');
+      const qrMemberId = qrParts[0] === 'COMPEX' && qrParts[1] ? qrParts[1] : null;
+      const member = await prisma.member.findFirst({ where: { OR: [{ registration: code }, { id: code }, ...(qrMemberId ? [{ id: qrMemberId }] : [])] }, include: { user: true } });
       if (!member) return send(res, 404, { error: 'Código não encontrado. Confira a carteirinha do associado.' });
       const existing = await prisma.eventCheckIn.findUnique({ where: { eventId_memberId: { eventId: item.eventId, memberId: member.id } } }).catch(() => null);
       if (existing) return send(res, 200, { alreadyCheckedIn: true, member: { name: member.user.name, course: member.course } });
       await prisma.eventCheckIn.create({ data: { eventId: item.eventId, memberId: member.id } });
+      await awardPoints(member.id, 'EVENTO_PRESENCA', 80, `Check-in no evento ${item.eventId}`).catch(error => console.error('[gamificação]', error));
       send(res, 201, { alreadyCheckedIn: false, member: { name: member.user.name, course: member.course } });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/training-checkins' && req.method === 'GET') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!['PRESIDENCIA', 'ESPORTES'].includes(session.role)) { send(res, 403, { error: 'Somente a equipe de Esportes pode validar presença em treinos.' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await (async () => {
+      const selectedId = url.searchParams.get('sessionId');
+      const sessionsList = await prisma.teamSession.findMany({ where: { type: 'TREINO' }, include: { team: true }, orderBy: { date: 'desc' }, take: 40 });
+      const activeTraining = (selectedId ? sessionsList.find(item => item.id === selectedId) : null) || sessionsList[0] || null;
+      if (!activeTraining) return send(res, 200, { sessions: [], training: null, total: 0, confirmed: 0, waiting: 0, recent: [] });
+      const [checkins, confirmed] = await Promise.all([
+        prisma.trainingCheckIn.findMany({ where: { sessionId: activeTraining.id }, include: { member: { include: { user: true } } }, orderBy: { createdAt: 'desc' } }),
+        prisma.teamEnrollment.count({ where: { teamId: activeTraining.teamId, status: 'APPROVED' } }),
+      ]);
+      send(res, 200, {
+        sessions: sessionsList.map(item => ({ id: item.id, teamId: item.teamId, teamName: item.team.name, date: item.date.toISOString(), location: item.location })),
+        training: { id: activeTraining.id, teamId: activeTraining.teamId, name: activeTraining.team.name, date: activeTraining.date.toISOString(), location: activeTraining.location },
+        total: checkins.length,
+        confirmed,
+        waiting: Math.max(0, confirmed - checkins.length),
+        recent: checkins.slice(0, 12).map(item => ({ name: item.member.user.name, course: item.member.course, createdAt: item.createdAt.toISOString(), checkedBy: item.checkedByName })),
+      });
+    })().catch(error => { console.error('[training-checkin]', error); return send(res, 500, { error: 'Não foi possível carregar o check-in do treino.' }); });
+    return true;
+  }
+  if (url.pathname === '/api/training-checkins' && req.method === 'POST') {
+    const session = internalSession(req);
+    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
+    if (!['PRESIDENCIA', 'ESPORTES'].includes(session.role)) { send(res, 403, { error: 'Somente a equipe de Esportes pode validar presença em treinos.' }); return true; }
+    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
+    await body(req).then(async item => {
+      if (!item.sessionId) return send(res, 400, { error: 'Selecione o treino antes de ler o QR Code.' });
+      const code = String(item.code || '').trim();
+      const qrParts = code.split(':');
+      const qrMemberId = qrParts[0] === 'COMPEX' && qrParts[1] ? qrParts[1] : null;
+      const [training, member] = await Promise.all([
+        prisma.teamSession.findFirst({ where: { id: item.sessionId, type: 'TREINO' }, include: { team: true } }),
+        prisma.member.findFirst({ where: { OR: [{ registration: code }, { id: code }, ...(qrMemberId ? [{ id: qrMemberId }] : [])] }, include: { user: true } }),
+      ]);
+      if (!training) return send(res, 404, { error: 'Treino não encontrado.' });
+      if (!member) return send(res, 404, { error: 'QR Code não pertence a um associado válido.' });
+      const enrollment = await prisma.teamEnrollment.findFirst({ where: { memberId: member.id, teamId: training.teamId, status: 'APPROVED' } });
+      if (!enrollment) return send(res, 403, { error: `${member.user.name} não possui participação aprovada em ${training.team.name}.` });
+      const existing = await prisma.trainingCheckIn.findUnique({ where: { sessionId_memberId: { sessionId: training.id, memberId: member.id } } });
+      if (existing) return send(res, 200, { alreadyCheckedIn: true, pointsAwarded: false, member: { name: member.user.name, course: member.course }, training: { name: training.team.name } });
+      await prisma.$transaction([
+        prisma.trainingCheckIn.create({ data: { sessionId: training.id, memberId: member.id, checkedByEmail: session.email, checkedByName: session.name } }),
+        prisma.sessionAttendance.upsert({ where: { sessionId_memberId: { sessionId: training.id, memberId: member.id } }, update: { status: 'CONFIRMED', respondedAt: new Date() }, create: { sessionId: training.id, memberId: member.id, status: 'CONFIRMED', respondedAt: new Date() } }),
+      ]);
+      const points = await awardPoints(member.id, 'TREINO_PRESENCA', 50, `Treino ${training.id}`);
+      send(res, 201, { alreadyCheckedIn: false, pointsAwarded: !!points, member: { name: member.user.name, course: member.course }, training: { name: training.team.name } });
+    }).catch(error => { console.error('[training-checkin]', error); return send(res, 400, { error: 'Não foi possível confirmar a presença no treino.' }); });
     return true;
   }
   if (url.pathname === '/api/stats' && req.method === 'GET' && prisma) {
