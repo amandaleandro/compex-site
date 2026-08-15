@@ -26,7 +26,7 @@ export default function LoginPage() {
       sessionStorage.setItem("compex-token", result.token);
       sessionStorage.setItem("compex-session", JSON.stringify(result.user));
       setEntered(true);
-      window.location.href = result.user.role === "ASSOCIADO" ? "/associado" : "/gestao/portal.html";
+      window.location.href = result.user.role === "ASSOCIADO" ? "/associado" : "/gestao";
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível entrar.");
     } finally { setLoading(false); }

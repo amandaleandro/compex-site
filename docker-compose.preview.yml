@@ -29,5 +29,23 @@ services:
       sh -c "npm ci && npm run db:generate && npx prisma db push --config backend/prisma.config.ts --accept-data-loss;
       npm run db:seed || true; npm start"
 
+  web:
+    image: node:22-alpine
+    container_name: compex-preview-web
+    restart: unless-stopped
+    depends_on:
+      - app
+    working_dir: /app/frontend/public-next
+    environment:
+      PORT: 3000
+      COMPEX_BACKEND_URL: http://app:3100
+      NEXT_PUBLIC_LEGACY_GESTAO_URL: http://191.252.208.234:3101
+    volumes:
+      - ./frontend/public-next:/app/frontend/public-next
+    ports:
+      - "0.0.0.0:3102:3000"
+    command: >-
+      sh -c "npm ci && npm run build && npm start"
+
 volumes:
   compex_preview_db:
