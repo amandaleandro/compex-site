@@ -13,6 +13,13 @@ const transactionCreateSchema = z.object({
   amount: z.coerce.number({ error: 'Valor deve ser um número positivo.' }).positive('Valor deve ser um número positivo.'),
   type: z.enum(['income', 'expense'], { error: "Tipo deve ser 'income' ou 'expense'." }),
   category: z.string().trim().min(1).optional(),
+  status: z.enum(['PENDING', 'PAID']).optional(),
+  dueDate: z.string().trim().min(1).optional(),
+  favorecido: z.string().trim().min(1).optional(),
+  paymentMethod: z.string().trim().min(1).optional(),
+  responsibleName: z.string().trim().min(1).optional(),
+  proofUrl: z.string().trim().min(1).optional(),
+  requestId: z.string().trim().min(1).optional(),
 });
 
 const transactionUpdateSchema = z.object({
@@ -21,6 +28,12 @@ const transactionUpdateSchema = z.object({
   amount: z.coerce.number({ error: 'Valor deve ser um número positivo.' }).positive('Valor deve ser um número positivo.').optional(),
   type: z.enum(['income', 'expense'], { error: "Tipo deve ser 'income' ou 'expense'." }).optional(),
   category: z.string().trim().min(1).optional(),
+  status: z.enum(['PENDING', 'PAID']).optional(),
+  dueDate: z.string().trim().min(1).optional(),
+  favorecido: z.string().trim().min(1).optional(),
+  paymentMethod: z.string().trim().min(1).optional(),
+  responsibleName: z.string().trim().min(1).optional(),
+  proofUrl: z.string().trim().min(1).optional(),
 });
 
 // Retorna { ok:true, data } ou { ok:false, message } com a primeira mensagem de erro do schema.

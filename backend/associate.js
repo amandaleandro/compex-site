@@ -8,11 +8,6 @@ const DEMO_EMAIL_BY_TOKEN = {
   'demo-session-associado': 'associado@compex.com.br'
 };
 
-const MEMBERSHIP_PLANS = {
-  semestral: { label: 'Plano Semestral', amount: 60, frequency: 6 },
-  anual: { label: 'Plano Anual', amount: 100, frequency: 12 }
-};
-
 function tokenFromReq(req) {
   return (req.headers.authorization || '').replace('Bearer ', '');
 }
@@ -156,7 +151,7 @@ async function handleAssociateRoute(pathname, req, res) {
   // GET /api/me/session-calls — convocações (treino/jogo) do atleta logado, pra confirmar presença
   if (pathname === '/api/me/session-calls' && req.method === 'GET') {
     if (!member) return send(res, 401, { error: 'Sessão inválida' });
-    const calls = await prisma.sessionAttendance.findMany({ where: { memberId: member.id }, include: { session: { include: { team: true } } }, orderBy: { createdAt: 'desc' } });
+    const calls = await prisma.sessionAttendance.findMany({ where: { memberId: member.id, session: { published: true } }, include: { session: { include: { team: true } } }, orderBy: { createdAt: 'desc' } });
     return send(res, 200, calls.map(c => ({
       id: c.id, status: c.status.toLowerCase(), createdAt: c.createdAt,
       teamName: c.session.team.name, sessionType: c.session.type, sessionDate: c.session.date, sessionLocation: c.session.location,
@@ -280,10 +275,13 @@ async function handleAssociateRoute(pathname, req, res) {
   }
 
   // POST /api/checkout/mensalidade — cria assinatura recorrente (PreApproval)
+  // O preço NUNCA vem do frontend: sempre lido do Plan ativo no banco a partir do planId.
   if (pathname === '/api/checkout/mensalidade' && req.method === 'POST') {
     if (!member) return send(res, 401, { error: 'Sessão inválida' });
     const payload = await readBody(req).catch(() => ({}));
-    const plan = MEMBERSHIP_PLANS[payload.planId] || MEMBERSHIP_PLANS.anual;
+    if (!payload.planId) return send(res, 400, { error: 'Informe o plano escolhido (planId).' });
+    const plan = await prisma.plan.findUnique({ where: { id: payload.planId } });
+    if (!plan || !plan.active) return send(res, 400, { error: 'Este plano não está disponível para contratação.' });
     const client = preApprovalClient();
     if (!client) {
       return send(res, 200, { initPoint: null, warning: 'MERCADOPAGO_ACCESS_TOKEN não configurado — configure a chave para gerar o link de pagamento real.' });
@@ -291,15 +289,15 @@ async function handleAssociateRoute(pathname, req, res) {
     try {
       const preapproval = await client.create({
         body: {
-          reason: `COMPEX — ${plan.label}`,
+          reason: `COMPEX — ${plan.name}`,
           external_reference: member.id,
           payer_email: member.userEmail,
-          auto_recurring: { frequency: plan.frequency, frequency_type: 'months', transaction_amount: plan.amount, currency_id: 'BRL' },
+          auto_recurring: { frequency: plan.durationMonths, frequency_type: 'months', transaction_amount: plan.priceCents / 100, currency_id: 'BRL' },
           back_url: `${baseUrl}/associado/mensalidade?status=success`,
           status: 'pending'
         }
       });
-      await prisma.member.update({ where: { id: member.id }, data: { mpPreapprovalId: preapproval.id, subscriptionStatus: preapproval.status } });
+      await prisma.member.update({ where: { id: member.id }, data: { mpPreapprovalId: preapproval.id, subscriptionStatus: preapproval.status, planId: plan.id, plan: plan.name } });
       return send(res, 200, { initPoint: preapproval.init_point });
     } catch (error) { return send(res, 500, { error: error.message }); }
   }

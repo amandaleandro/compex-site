@@ -36,17 +36,20 @@ enum Rank {
 }
 
 model User {
-  id        String            @id @default(cuid())
-  name      String
-  email     String            @unique
-  password  String
-  role      Role              @default(ASSOCIADO)
-  rank      Rank              @default(DIRETOR)
-  birthDate DateTime?
-  member    Member?
-  warnings  DirectorWarning[]
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  name        String
+  email       String            @unique
+  password    String
+  role        Role              @default(ASSOCIADO)
+  rank        Rank              @default(DIRETOR)
+  permissions Json? // permissões extras concedidas além das padrão do Role (array de strings, ex: ["financeiro.aprovar"])
+  active      Boolean           @default(true) // false = desligado da gestão; histórico é preservado, nunca apagado
+  leftAt      DateTime?
+  birthDate   DateTime?
+  member      Member?
+  warnings    DirectorWarning[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 enum WarningType {
@@ -70,6 +73,8 @@ model Member {
   userId         String    @unique
   course         String
   plan           String
+  planRef        Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planId         String?
   sportSlots     Int       @default(1)
   membershipKind String    @default("SOCIO")
   status         Status    @default(PENDING)
@@ -167,6 +172,9 @@ model TeamSession {
   refereePixKey String?
   refereeCost   Decimal?            @db.Decimal(10, 2)
   notes         String?
+  // Convocação de jogo só fica visível ao atleta quando published=true — permite à gestão
+  // montar a lista de convocados antes de anunciar. Treinos continuam publicados por padrão.
+  published     Boolean             @default(true)
   createdAt     DateTime            @default(now())
   charges       SessionCharge[]
   attendances   SessionAttendance[]
@@ -364,13 +372,27 @@ model Event {
   checkIns EventCheckIn[]
 }
 
+enum TransactionStatus {
+  PENDING
+  PAID
+}
+
 model Transaction {
-  id          String          @id @default(cuid())
-  description String
-  amount      Decimal         @db.Decimal(12, 2)
-  type        TransactionType
-  category    String
-  createdAt   DateTime        @default(now())
+  id              String            @id @default(cuid())
+  description     String
+  amount          Decimal           @db.Decimal(12, 2)
+  type            TransactionType
+  category        String
+  // PENDING = conta a pagar/receber ainda em aberto; PAID = já liquidada (comportamento
+  // padrão anterior a este campo — por isso o default é PAID, para não alterar lançamentos existentes).
+  status          TransactionStatus @default(PAID)
+  dueDate         DateTime?
+  favorecido      String?
+  paymentMethod   String?
+  responsibleName String?
+  proofUrl        String?
+  requestId       String? // vínculo com a Central de Solicitações, quando a movimentação nasceu de uma solicitação aprovada
+  createdAt       DateTime          @default(now())
 }
 
 model News {
@@ -396,12 +418,16 @@ model Athlete {
 }
 
 model Document {
-  id        String   @id @default(cuid())
-  name      String
-  category  String
-  url       String
-  isPublic  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  category     String
+  url          String
+  isPublic     Boolean  @default(false)
+  // Vínculo opcional com o registro que originou o documento (ex: comprovante de uma Request),
+  // pra aparecer tanto na Central de Documentos quanto na tela de origem.
+  linkedEntity String?
+  linkedId     String?
+  createdAt    DateTime @default(now())
 }
 
 model Poll {
@@ -517,15 +543,21 @@ model Benefit {
 }
 
 model Plan {
-  id          String   @id @default(cuid())
-  name        String
-  price       String
-  period      String   @default("/ano")
-  slots       Int      @default(1)
-  icon        String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  price          String // legado — mantido por compatibilidade; fonte de verdade para cobrança agora é priceCents
+  priceCents     Int      @default(0)
+  period         String   @default("/ano") // legado — texto exibido, ex. "/ano"
+  periodicity    String   @default("ANUAL") // MENSAL | SEMESTRAL | ANUAL (livre, não travado em enum)
+  durationMonths Int      @default(12)
+  slots          Int      @default(1)
+  icon           String?
+  description    String?
+  benefits       Json?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  members        Member[]
 }
 
 model SocialSubmission {
@@ -577,4 +609,249 @@ model ChampionshipGame {
   opponentScore   Int?
   notes           String?
   createdAt       DateTime               @default(now())
+}
+
+// Toda ação administrativa relevante do sistema deve gerar um registro aqui —
+// é a trilha de auditoria exigida para "quem solicitou → quem aprovou → quem executou".
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorName  String
+  actorRole  String?
+  action     String // ex: "request.create", "request.approve", "request.reject", "transaction.create"
+  entity     String // ex: "Request", "Transaction", "Member"
+  entityId   String?
+  before     Json?
+  after      Json?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+enum RequestType {
+  PAGAMENTO_TECNICO
+  PAGAMENTO_ARBITRAGEM
+  COMPRA_MATERIAIS
+  FERRAMENTA_SOFTWARE
+  CONTRATACAO_FORNECEDOR
+  TRANSPORTE
+  ALIMENTACAO
+  INSCRICAO_CAMPEONATO
+  REEMBOLSO
+  EVENTO
+  MATERIAL_ESPORTIVO
+  DESPESA_ADMINISTRATIVA
+  OUTRAS_DESPESAS
+}
+
+enum RequestPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum RequestStatus {
+  RASCUNHO
+  SOLICITADO
+  APROVACAO_DIRETOR
+  FINANCEIRO
+  PRESIDENCIA
+  APROVADO
+  PAGO
+  FINALIZADO
+  REJEITADO
+}
+
+// Central de Solicitações — módulo genérico que substitui pedidos por WhatsApp/planilha
+// por um fluxo único com histórico e aprovação, para qualquer tipo de pedido interno.
+model Request {
+  id             String          @id @default(cuid())
+  type           RequestType
+  requesterName  String
+  requesterEmail String
+  requesterRole  String
+  department     String
+  description    String
+  justification  String?
+  valuePlanned   Decimal?        @db.Decimal(12, 2)
+  valueFinal     Decimal?        @db.Decimal(12, 2)
+  favorecido     String?
+  dueDate        DateTime?
+  priority       RequestPriority @default(MEDIA)
+  attachments    Json? // array de { name, url }
+  observations   String?
+  status         RequestStatus   @default(RASCUNHO)
+  proofUrl       String? // comprovante de pagamento anexado
+  rejectedReason String?
+  // Fluxo de compras (tipos COMPRA_MATERIAIS, MATERIAL_ESPORTIVO, FERRAMENTA_SOFTWARE,
+  // CONTRATACAO_FORNECEDOR): cotação de fornecedores, nota fiscal e confirmação de recebimento,
+  // reaproveitando o mesmo fluxo de aprovação em vez de criar um módulo à parte.
+  items                   Json? // array de { name, quantity, unit }
+  quotations              Json? // array de { supplier, value, notes, addedBy, addedAt } — cotações registradas
+  invoiceUrl              String? // nota fiscal
+  purchaseResponsibleName String? // responsável pela compra
+  receivedByName          String? // responsável pelo recebimento
+  receivedAt              DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+enum DepartureStatus {
+  SOLICITADO
+  EM_ANALISE
+  APROVADO
+  REJEITADO
+  FINALIZADO
+}
+
+// Solicitação formal de desligamento — substitui o "avisei no grupo que vou sair".
+// Ao ser aprovada e finalizada, User.active vira false e User.leftAt é preenchido,
+// mas o registro da solicitação (e o histórico do usuário) nunca é apagado.
+model DepartureRequest {
+  id             String          @id @default(cuid())
+  requesterName  String
+  requesterEmail String
+  requesterRole  String
+  department     String
+  reason         String
+  observations   String?
+  attachments    Json?
+  status         DepartureStatus @default(SOLICITADO)
+  rejectedReason String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+enum RestStatus {
+  SOLICITADO
+  APROVADO
+  REJEITADO
+}
+
+// Descanso da gestão — até 30 dias, uma vez por semestre (semester = "2026-1"/"2026-2").
+model RestRequest {
+  id              String     @id @default(cuid())
+  requesterName   String
+  requesterEmail  String
+  requesterRole   String
+  department      String
+  startDate       DateTime
+  endDate         DateTime
+  days            Int
+  semester        String
+  reason          String?
+  substituteName  String?
+  status          RestStatus @default(SOLICITADO)
+  rejectedReason  String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+enum ScheduleFunction {
+  SUMULA
+  APOIO_JOGO
+  BANDEIRAO
+  MATERIAL
+  TORCIDA
+  FOTOGRAFIA
+  SOCIAL_MEDIA
+  EVENTOS
+  BARRACAS
+  RECEPCAO
+  VENDA_INGRESSOS
+  TRANSPORTE
+  ORGANIZACAO
+  OUTRA
+}
+
+enum ScheduleStatus {
+  AGUARDANDO
+  CONFIRMADO
+  TROCA_SOLICITADA
+  SUBSTITUIDO
+  RECUSADO
+  CONCLUIDO
+}
+
+// Escala genérica — cobre súmula, bandeirão, apoio de jogo, barracas, recepção etc.
+// referenceLabel é livre (nome do jogo/evento) para não depender de vincular a um model específico.
+model Schedule {
+  id              String          @id @default(cuid())
+  referenceLabel  String
+  function        ScheduleFunction
+  assignedName    String
+  assignedEmail   String?
+  date            DateTime
+  time            String?
+  location        String?
+  instructions    String?
+  status          ScheduleStatus  @default(AGUARDANDO)
+  substituteName  String?
+  createdByName   String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+enum DepartmentPlanStatus {
+  PLANEJADO
+  EM_ANDAMENTO
+  CONCLUIDO
+  ATRASADO
+}
+
+// Planejamento por departamento — objetivos/metas do semestre. O indicador de evolução
+// (% concluído) é calculado a partir das Task do mesmo departamento, sem duplicar dado.
+model DepartmentPlan {
+  id            String               @id @default(cuid())
+  department    String
+  semester      String
+  objective     String
+  actions       Json? // array de { action, responsible, dueDate, done }
+  responsible   String?
+  dueDate       DateTime?
+  status        DepartmentPlanStatus @default(PLANEJADO)
+  createdByName String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+// Notificação interna — evita depender de WhatsApp para avisar sobre aprovação,
+// escala nova, prazo etc. Lida a partir do próprio sistema.
+model Notification {
+  id        String   @id @default(cuid())
+  userEmail String
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userEmail, read])
+}
+
+enum MeetingStatus {
+  RASCUNHO
+  FINALIZADA
+}
+
+// Reunião + ata em um único registro: enquanto RASCUNHO pode ser editada; ao virar
+// FINALIZADA representa a ata oficial e nunca é apagada (histórico permanente).
+model Meeting {
+  id            String        @id @default(cuid())
+  title         String
+  type          String        @default("Ordinária")
+  date          DateTime
+  time          String?
+  participants  Json? // array de nomes
+  agenda        String?
+  notes         String?
+  decisions     Json? // array de { decision, responsible, dueDate }
+  attachments   Json?
+  status        MeetingStatus @default(RASCUNHO)
+  createdByName String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }

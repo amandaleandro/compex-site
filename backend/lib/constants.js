@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-const root = path.join(__dirname, '..', '..', 'frontend');
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const associatePhotosDir = path.join(uploadsDir, 'associates');
@@ -26,22 +25,8 @@ const LEGACY_TOKENS = {
   'demo-session-associado': { name: 'Lucas Associado', role: 'ASSOCIADO', rank: 'DIRETOR', email: 'associado@compex.com.br' }
 };
 const INTERNAL_ROLES = new Set(['PRESIDENCIA', 'FINANCEIRO', 'ESPORTES', 'EVENTOS', 'MARKETING', 'PRODUTOS', 'PATRIMONIO']);
-const PAGE_ROLES = {
-  'finance.html': new Set(['PRESIDENCIA', 'FINANCEIRO']),
-  'sponsors.html': new Set(['PRESIDENCIA', 'FINANCEIRO', 'MARKETING']),
-  'members.html': new Set(['PRESIDENCIA', 'FINANCEIRO', 'ESPORTES']),
-  'sports.html': new Set(['PRESIDENCIA', 'ESPORTES']),
-  'event-manager.html': new Set(['PRESIDENCIA', 'EVENTOS']),
-  'checkin.html': new Set(['PRESIDENCIA', 'EVENTOS', 'ESPORTES']),
-  'communication.html': new Set(['PRESIDENCIA', 'MARKETING']),
-  'produtos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),
-  'pedidos.html': new Set(['PRESIDENCIA', 'PRODUTOS']),
-  'patrimonio.html': new Set(['PRESIDENCIA', 'PATRIMONIO']),
-  'beneficios-gestao.html': new Set(['PRESIDENCIA', 'MARKETING', 'FINANCEIRO']),
-  'campeonatos.html': new Set(['PRESIDENCIA', 'ESPORTES'])
-};
 
 module.exports = {
-  root, uploadsDir, associatePhotosDir, patrimonioDocsDir, dataFile, port, mime, initialData,
-  SESSION_TTL_MS, sessionsFile, LEGACY_TOKENS, INTERNAL_ROLES, PAGE_ROLES,
+  uploadsDir, associatePhotosDir, patrimonioDocsDir, dataFile, port, mime, initialData,
+  SESSION_TTL_MS, sessionsFile, LEGACY_TOKENS, INTERNAL_ROLES,
 };

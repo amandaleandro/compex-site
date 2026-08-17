@@ -42,7 +42,9 @@ async function chargeSessionParticipants(session) {
   const team = await prisma.team.findUnique({ where: { id: session.teamId } });
   if (!team) return;
   const enrollments = await prisma.teamEnrollment.findMany({ where: { teamId: session.teamId }, include: { member: { include: { user: true } } } });
-  await createAttendanceCalls(session, enrollments);
+  // Jogo não publicado: a gestão ainda está montando a convocação (roster) manualmente,
+  // então não convoca todo mundo automaticamente — só quando published=true.
+  if (session.type !== 'JOGO' || session.published !== false) await createAttendanceCalls(session, enrollments);
   const label = `${team.name} · ${session.type === 'JOGO' ? 'Jogo' : 'Treino'} de ${new Date(session.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`;
   const refereeCostCents = session.refereeCost ? Math.round(Number(session.refereeCost) * 100) : 0;
   const dropInCents = team.dropInPriceCents || 0;
@@ -85,7 +87,23 @@ async function computeFinanceOverview() {
   ]);
 
   const entries = [];
-  manual.forEach(t => entries.push({ id: t.id, description: t.description, category: t.category, amount: Number(t.amount), type: t.type === 'INCOME' ? 'income' : 'expense', date: t.createdAt, source: 'manual' }));
+  const payables = [];
+  const receivables = [];
+  manual.forEach(t => {
+    const mapped = {
+      id: t.id, description: t.description, category: t.category, amount: Number(t.amount),
+      type: t.type === 'INCOME' ? 'income' : 'expense', date: t.createdAt, source: 'manual',
+      status: t.status, dueDate: t.dueDate, favorecido: t.favorecido, paymentMethod: t.paymentMethod,
+      responsibleName: t.responsibleName, proofUrl: t.proofUrl, requestId: t.requestId,
+    };
+    // Contas em aberto (PENDING) não entram no caixa realizado — só aparecem nas listas de
+    // contas a pagar/receber, até serem marcadas como pagas.
+    if (t.status === 'PENDING') {
+      if (mapped.type === 'expense') payables.push(mapped); else receivables.push(mapped);
+      return;
+    }
+    entries.push(mapped);
+  });
   closedSponsors.forEach(s => entries.push({ id: `sponsor:${s.id}`, description: `Patrocínio · ${s.company}`, category: 'Patrocínio', amount: parseSponsorValue(s.value), type: 'income', date: s.createdAt, source: 'auto' }));
   paidCharges.forEach(c => entries.push({ id: `charge:${c.id}`, description: `Cobrança avulso · ${c.member.user.name} · ${c.session.team.name}`, category: 'Treino/jogo avulso', amount: c.amountCents / 100, type: 'income', date: c.createdAt, source: 'auto' }));
   paidOrders.forEach(o => entries.push({ id: `order:${o.id}`, description: `Loja · ${o.member.user.name}`, category: 'Loja', amount: o.totalCents / 100, type: 'income', date: o.createdAt, source: 'auto' }));
@@ -105,7 +123,7 @@ async function computeFinanceOverview() {
   });
   const months = Object.keys(monthly).sort().slice(-12).map(key => ({ month: key, ...monthly[key] }));
 
-  return { entries, months };
+  return { entries, months, payables, receivables };
 }
 
 module.exports = { teamSlotWeight, tryGeneratePixForCharge, createAttendanceCalls, chargeSessionParticipants, money, computeFinanceOverview };

@@ -7,11 +7,12 @@ const Busboy = require('busboy');
 const { prisma } = require('../db');
 const { uploadsDir, patrimonioDocsDir } = require('../lib/constants');
 const { readData, writeData, send, body } = require('../lib/http');
-const { resolveSession, bearerToken, canManageAccounts } = require('../lib/sessions');
+const { resolveSession, bearerToken, canManageAccounts, canManagePlans } = require('../lib/sessions');
 const { INTERNAL_ROLES } = require('../lib/constants');
-const { teamSlotWeight, chargeSessionParticipants, computeFinanceOverview } = require('../lib/finance');
+const { teamSlotWeight, chargeSessionParticipants, computeFinanceOverview, createAttendanceCalls } = require('../lib/finance');
 const { transactionCreateSchema, transactionUpdateSchema, validate, IMAGE_MIME_TYPES, NEWS_MEDIA_MIME_TYPES, isAllowedMime } = require('../lib/validation');
 const { normalizeCpf, isValidCpf } = require('../lib/cpf');
+const { logAudit } = require('../lib/audit');
 
 function collection(name, req, res) {
   const data = readData();
@@ -119,25 +120,32 @@ async function databaseCollection(name, req, res, url) {
   }
   if (!prisma) return collection(name, req, res);
   if (name === 'events') {
-    if (req.method === 'GET') return send(res, 200, (await prisma.event.findMany({ orderBy: { createdAt: 'desc' } })).map(event => {
-      const link = event.ticketUrl || event.boraFestUrl || '';
-      const revenue = event.revenue ? Number(event.revenue) : 0;
-      const expenses = event.expenses ? Number(event.expenses) : 0;
-      const profit = revenue - expenses;
-      return {
-        ...event,
-        date: event.date.toISOString(),
-        platform: event.platform || 'BORAFEST',
-        ticketUrl: link,
-        link: link,
-        boraFestUrl: event.boraFestUrl || link,
-        isOwnOrganization: event.isOwnOrganization !== false,
-        revenue,
-        expenses,
-        profit,
-        financialNotes: event.financialNotes || ''
-      };
-    }));
+    if (req.method === 'GET') {
+      const session = resolveSession(bearerToken(req));
+      const canSeeFinancials = !!session && INTERNAL_ROLES.has(session.role);
+      return send(res, 200, (await prisma.event.findMany({ orderBy: { createdAt: 'desc' } })).map(event => {
+        const link = event.ticketUrl || event.boraFestUrl || '';
+        const revenue = event.revenue ? Number(event.revenue) : 0;
+        const expenses = event.expenses ? Number(event.expenses) : 0;
+        const profit = revenue - expenses;
+        const base = {
+          ...event,
+          date: event.date.toISOString(),
+          platform: event.platform || 'BORAFEST',
+          ticketUrl: link,
+          link: link,
+          boraFestUrl: event.boraFestUrl || link,
+          isOwnOrganization: event.isOwnOrganization !== false,
+        };
+        if (!canSeeFinancials) {
+          delete base.revenue;
+          delete base.expenses;
+          delete base.financialNotes;
+          return base;
+        }
+        return { ...base, revenue, expenses, profit, financialNotes: event.financialNotes || '' };
+      }));
+    }
     if (req.method === 'POST') return body(req).then(async item => {
       const platform = item.platform || 'BORAFEST';
       const ticketUrl = item.ticketUrl || item.link || item.boraFestUrl || null;
@@ -234,27 +242,52 @@ async function databaseCollection(name, req, res, url) {
     }
   }
   if (name === 'transactions') {
-    if (req.method === 'GET') return send(res, 200, (await prisma.transaction.findMany({ orderBy: { createdAt: 'desc' } })).map(item => ({ ...item, amount: Number(item.amount), type: item.type === 'INCOME' ? 'income' : 'expense' })));
+    const mapTransaction = item => ({ ...item, amount: Number(item.amount), type: item.type === 'INCOME' ? 'income' : 'expense', dueDate: item.dueDate ? item.dueDate.toISOString() : null });
+    if (req.method === 'GET') return send(res, 200, (await prisma.transaction.findMany({ orderBy: { createdAt: 'desc' } })).map(mapTransaction));
     if (req.method === 'POST') return body(req).then(async item => {
       const check = validate(transactionCreateSchema, item);
       if (!check.ok) return send(res, 400, { error: check.message });
       const valid = check.data;
-      const transaction = await prisma.transaction.create({ data: { description: valid.description, amount: valid.amount, type: valid.type === 'income' ? 'INCOME' : 'EXPENSE', category: valid.category || 'Operação' } });
-      send(res, 201, { ...transaction, amount: Number(transaction.amount) });
+      const transaction = await prisma.transaction.create({
+        data: {
+          description: valid.description, amount: valid.amount, type: valid.type === 'income' ? 'INCOME' : 'EXPENSE', category: valid.category || 'Operação',
+          status: valid.status || 'PAID', dueDate: valid.dueDate ? new Date(valid.dueDate) : null, favorecido: valid.favorecido || null,
+          paymentMethod: valid.paymentMethod || null, responsibleName: valid.responsibleName || null, proofUrl: valid.proofUrl || null, requestId: valid.requestId || null,
+        },
+      });
+      const mapped = mapTransaction(transaction);
+      logAudit({ session: resolveSession(bearerToken(req)), action: 'transaction.create', entity: 'Transaction', entityId: transaction.id, after: mapped });
+      send(res, 201, mapped);
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'PUT') return body(req).then(async item => {
       const check = validate(transactionUpdateSchema, item);
       if (!check.ok) return send(res, 400, { error: check.message });
       const valid = check.data;
+      const before = await prisma.transaction.findUnique({ where: { id: valid.id } });
+      if (valid.status === 'PAID' && before?.status !== 'PAID' && !valid.proofUrl && !before?.proofUrl) {
+        return send(res, 400, { error: 'Anexe o comprovante antes de marcar como pago.' });
+      }
       const data = {};
       if (valid.description !== undefined) data.description = valid.description;
       if (valid.amount !== undefined) data.amount = valid.amount;
       if (valid.category !== undefined) data.category = valid.category;
       if (valid.type !== undefined) data.type = valid.type === 'income' ? 'INCOME' : 'EXPENSE';
+      if (valid.status !== undefined) data.status = valid.status;
+      if (valid.dueDate !== undefined) data.dueDate = new Date(valid.dueDate);
+      if (valid.favorecido !== undefined) data.favorecido = valid.favorecido;
+      if (valid.paymentMethod !== undefined) data.paymentMethod = valid.paymentMethod;
+      if (valid.responsibleName !== undefined) data.responsibleName = valid.responsibleName;
+      if (valid.proofUrl !== undefined) data.proofUrl = valid.proofUrl;
       const transaction = await prisma.transaction.update({ where: { id: valid.id }, data });
-      send(res, 200, { ...transaction, amount: Number(transaction.amount), type: transaction.type === 'INCOME' ? 'income' : 'expense' });
+      const mapped = mapTransaction(transaction);
+      logAudit({ session: resolveSession(bearerToken(req)), action: 'transaction.update', entity: 'Transaction', entityId: transaction.id, before: before ? mapTransaction(before) : null, after: mapped });
+      send(res, 200, mapped);
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.transaction.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    if (req.method === 'DELETE') return body(req).then(async item => {
+      const removed = await prisma.transaction.delete({ where: { id: item.id } });
+      logAudit({ session: resolveSession(bearerToken(req)), action: 'transaction.delete', entity: 'Transaction', entityId: item.id, before: { ...removed, amount: Number(removed.amount) } });
+      send(res, 200, { ok: true });
+    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
   }
   if (name === 'benefits') {
     if (req.method === 'GET') return send(res, 200, (await prisma.benefit.findMany({ orderBy: { createdAt: 'asc' } })).map(item => ({ ...item, updatedAt: item.updatedAt.toISOString(), createdAt: item.createdAt.toISOString() })));
@@ -275,23 +308,83 @@ async function databaseCollection(name, req, res, url) {
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.benefit.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Informe o id do registro' }); });
   }
   if (name === 'plans') {
-    if (req.method === 'GET') return send(res, 200, (await prisma.plan.findMany({ orderBy: { createdAt: 'asc' } })).map(item => ({ ...item, updatedAt: item.updatedAt.toISOString(), createdAt: item.createdAt.toISOString() })));
-    if (req.method === 'POST') return body(req).then(async item => {
-      const plan = await prisma.plan.create({ data: { name: item.name, price: item.price, period: item.period || '/ano', slots: item.slots !== undefined ? Number(item.slots) : 1, icon: item.icon || null, description: item.description || null } });
-      send(res, 201, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
-    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    if (req.method === 'PUT') return body(req).then(async item => {
-      const data = {};
-      if (item.name !== undefined) data.name = item.name;
-      if (item.price !== undefined) data.price = item.price;
-      if (item.period !== undefined) data.period = item.period;
-      if (item.slots !== undefined) data.slots = Number(item.slots);
-      if (item.icon !== undefined) data.icon = item.icon || null;
-      if (item.description !== undefined) data.description = item.description || null;
-      const plan = await prisma.plan.update({ where: { id: item.id }, data });
-      send(res, 200, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
-    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Registro não encontrado' }); });
-    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.plan.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Informe o id do registro' }); });
+    const planSession = resolveSession(bearerToken(req));
+    const isPlanManager = canManagePlans(planSession);
+    if (req.method === 'GET') {
+      const plans = await prisma.plan.findMany({
+        where: isPlanManager ? undefined : { active: true },
+        orderBy: { createdAt: 'asc' },
+        include: isPlanManager ? { _count: { select: { members: true } } } : undefined,
+      });
+      return send(res, 200, plans.map(item => ({
+        ...item,
+        memberCount: isPlanManager ? item._count.members : undefined,
+        _count: undefined,
+        updatedAt: item.updatedAt.toISOString(),
+        createdAt: item.createdAt.toISOString(),
+      })));
+    }
+    if (req.method === 'POST') {
+      if (!isPlanManager) return send(res, 403, { error: 'Somente Presidência ou Financeiro podem cadastrar planos.' });
+      return body(req).then(async item => {
+        const priceCents = Math.round(Number(item.priceCents));
+        if (!item.name || !Number.isFinite(priceCents) || priceCents < 0) return send(res, 400, { error: 'Informe nome e valor (priceCents) válidos.' });
+        const plan = await prisma.plan.create({
+          data: {
+            name: item.name,
+            price: item.price !== undefined ? String(item.price) : (priceCents / 100).toFixed(2),
+            priceCents,
+            period: item.period || '/ano',
+            periodicity: item.periodicity || 'ANUAL',
+            durationMonths: item.durationMonths !== undefined ? Number(item.durationMonths) : 12,
+            slots: item.slots !== undefined ? Number(item.slots) : 1,
+            icon: item.icon || null,
+            description: item.description || null,
+            benefits: item.benefits !== undefined ? item.benefits : undefined,
+            active: item.active !== undefined ? Boolean(item.active) : true,
+          },
+        });
+        logAudit({ session: planSession, action: 'plan.create', entity: 'Plan', entityId: plan.id, after: plan });
+        send(res, 201, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
+      }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
+    }
+    if (req.method === 'PUT') {
+      if (!isPlanManager) return send(res, 403, { error: 'Somente Presidência ou Financeiro podem editar planos.' });
+      return body(req).then(async item => {
+        const before = await prisma.plan.findUnique({ where: { id: item.id } });
+        const data = {};
+        if (item.name !== undefined) data.name = item.name;
+        if (item.price !== undefined) data.price = item.price;
+        if (item.priceCents !== undefined) data.priceCents = Math.round(Number(item.priceCents));
+        if (item.period !== undefined) data.period = item.period;
+        if (item.periodicity !== undefined) data.periodicity = item.periodicity;
+        if (item.durationMonths !== undefined) data.durationMonths = Number(item.durationMonths);
+        if (item.slots !== undefined) data.slots = Number(item.slots);
+        if (item.icon !== undefined) data.icon = item.icon || null;
+        if (item.description !== undefined) data.description = item.description || null;
+        if (item.benefits !== undefined) data.benefits = item.benefits;
+        if (item.active !== undefined) data.active = Boolean(item.active);
+        const plan = await prisma.plan.update({ where: { id: item.id }, data });
+        logAudit({ session: planSession, action: 'plan.update', entity: 'Plan', entityId: plan.id, before, after: plan });
+        send(res, 200, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString() });
+      }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Registro não encontrado' }); });
+    }
+    if (req.method === 'DELETE') {
+      if (!isPlanManager) return send(res, 403, { error: 'Somente Presidência ou Financeiro podem desativar planos.' });
+      // Nunca apagar fisicamente: planos podem ter sócios/pagamentos vinculados. Exclusão real
+      // só é permitida se não houver nenhum sócio referenciando o plano (planId).
+      return body(req).then(async item => {
+        const linked = await prisma.member.count({ where: { planId: item.id } });
+        if (linked > 0) {
+          const plan = await prisma.plan.update({ where: { id: item.id }, data: { active: false } });
+          logAudit({ session: planSession, action: 'plan.deactivate', entity: 'Plan', entityId: plan.id, after: plan });
+          return send(res, 200, { ...plan, updatedAt: plan.updatedAt.toISOString(), createdAt: plan.createdAt.toISOString(), deactivatedInstead: true });
+        }
+        await prisma.plan.delete({ where: { id: item.id } });
+        logAudit({ session: planSession, action: 'plan.delete', entity: 'Plan', entityId: item.id });
+        send(res, 200, { ok: true });
+      }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Informe o id do registro' }); });
+    }
   }
   if (name === 'finance-overview') {
     const session = resolveSession(bearerToken(req));
@@ -348,10 +441,14 @@ async function databaseCollection(name, req, res, url) {
       if (cpfInUse) return send(res, 409, { error: 'Este CPF já está vinculado a uma conta.' });
       const referrer = item.referralCode ? await prisma.member.findUnique({ where: { referralCode: item.referralCode } }) : null;
       const isAvulso = item.membershipKind === 'AVULSO';
+      const chosenPlan = !isAvulso && item.planId ? await prisma.plan.findFirst({ where: { id: item.planId, active: true } }) : null;
+      if (!isAvulso && item.planId && !chosenPlan) return send(res, 400, { error: 'Este plano não está disponível.' });
       const hashed = await bcrypt.hash(String(item.password), 10);
       const user = await prisma.user.create({ data: { name, email, password: hashed, role: 'ASSOCIADO', member: { create: {
         course: item.course, registration, cpf, socialName: String(item.socialName || '').trim() || null, nickname: String(item.nickname || '').trim() || null,
-        plan: isAvulso ? 'Avulso' : (item.plan || 'Anual'), sex: item.sex || null, birthDate: item.birthDate ? new Date(item.birthDate) : null,
+        plan: isAvulso ? 'Avulso' : (chosenPlan ? chosenPlan.name : (item.plan || 'Anual')),
+        planId: chosenPlan ? chosenPlan.id : undefined,
+        sex: item.sex || null, birthDate: item.birthDate ? new Date(item.birthDate) : null,
         phone: item.phone || null,
         memberType: item.memberType === 'ATLETA' ? 'ATLETA' : 'TORCEDOR', selectedSports: Array.isArray(item.selectedSports) ? item.selectedSports : [],
         membershipKind: isAvulso ? 'AVULSO' : 'SOCIO',
@@ -378,8 +475,15 @@ async function databaseCollection(name, req, res, url) {
           if (item.name !== undefined) data.user.update.name = item.name;
           if (item.email !== undefined) data.user.update.email = item.email.trim().toLowerCase();
         }
+        const before = await prisma.member.findUnique({ where: { id: item.id }, include: { user: true } });
         const member = await prisma.member.update({ where: { id: item.id }, data, include: { user: true } });
-        send(res, 200, { id: member.id, name: member.user.name, email: member.user.email, course: member.course, plan: member.plan, status: member.status.toLowerCase(), sportSlots: member.sportSlots });
+        const mapped = { id: member.id, name: member.user.name, email: member.user.email, course: member.course, plan: member.plan, status: member.status.toLowerCase(), sportSlots: member.sportSlots };
+        logAudit({
+          session, action: 'member.update', entity: 'Member', entityId: member.id,
+          before: before ? { name: before.user.name, email: before.user.email, course: before.course, plan: before.plan, status: before.status.toLowerCase(), sportSlots: before.sportSlots } : null,
+          after: mapped,
+        });
+        send(res, 200, mapped);
       }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     }
   }
@@ -478,29 +582,46 @@ async function databaseCollection(name, req, res, url) {
   if (name === 'team-sessions') {
     const session = resolveSession(bearerToken(req));
     if (!session || !INTERNAL_ROLES.has(session.role)) return send(res, 401, { error: 'Autenticação necessária' });
-    const mapSession = s => ({ id: s.id, teamId: s.teamId, teamName: s.team.name, type: s.type, date: s.date.toISOString(), location: s.location, coachName: s.coachName, coachCost: s.coachCost === null ? null : Number(s.coachCost), refereeName: s.refereeName, refereePixKey: s.refereePixKey, refereeCost: s.refereeCost === null ? null : Number(s.refereeCost), notes: s.notes, createdAt: s.createdAt.toISOString() });
+    const mapSession = s => ({ id: s.id, teamId: s.teamId, teamName: s.team.name, type: s.type, date: s.date.toISOString(), location: s.location, coachName: s.coachName, coachCost: s.coachCost === null ? null : Number(s.coachCost), refereeName: s.refereeName, refereePixKey: s.refereePixKey, refereeCost: s.refereeCost === null ? null : Number(s.refereeCost), notes: s.notes, published: s.published, createdAt: s.createdAt.toISOString() });
     if (req.method === 'GET') {
       const teamId = new URL(req.url, 'http://internal').searchParams.get('teamId');
       const sessions = await prisma.teamSession.findMany({ where: teamId ? { teamId } : undefined, include: { team: true }, orderBy: { date: 'desc' } });
       return send(res, 200, sessions.map(mapSession));
     }
     if (req.method === 'POST') return body(req).then(async item => {
+      const type = item.type === 'JOGO' ? 'JOGO' : 'TREINO';
+      // Jogo nasce não publicado por padrão — a gestão monta a convocação antes de anunciar.
+      // Treino continua sempre visível (é a convocação automática de todo mundo vinculado).
+      const published = type === 'TREINO' ? true : item.published === true;
       const created = await prisma.teamSession.create({ data: {
-        teamId: item.teamId, type: item.type === 'JOGO' ? 'JOGO' : 'TREINO', date: new Date(`${String(item.date).slice(0, 10)}T12:00:00`), location: item.location || null,
+        teamId: item.teamId, type, date: new Date(`${String(item.date).slice(0, 10)}T12:00:00`), location: item.location || null,
         coachName: item.coachName || null, coachCost: item.coachCost === '' || item.coachCost === undefined || item.coachCost === null ? null : Number(item.coachCost),
         refereeName: item.refereeName || null, refereePixKey: item.refereePixKey || null, refereeCost: item.refereeCost === '' || item.refereeCost === undefined || item.refereeCost === null ? null : Number(item.refereeCost),
-        notes: item.notes || null,
+        notes: item.notes || null, published,
       }, include: { team: true } });
       chargeSessionParticipants(created).catch(error => console.error('Erro ao gerar cobranças da sessão:', error.message));
       send(res, 201, mapSession(created));
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'PUT') return body(req).then(async item => {
-      const updated = await prisma.teamSession.update({ where: { id: item.id }, data: {
-        type: item.type === 'JOGO' ? 'JOGO' : 'TREINO', date: new Date(`${String(item.date).slice(0, 10)}T12:00:00`), location: item.location || null,
+      const data = {
         coachName: item.coachName || null, coachCost: item.coachCost === '' || item.coachCost === undefined || item.coachCost === null ? null : Number(item.coachCost),
         refereeName: item.refereeName || null, refereePixKey: item.refereePixKey || null, refereeCost: item.refereeCost === '' || item.refereeCost === undefined || item.refereeCost === null ? null : Number(item.refereeCost),
         notes: item.notes || null,
-      }, include: { team: true } });
+      };
+      if (item.type !== undefined) data.type = item.type === 'JOGO' ? 'JOGO' : 'TREINO';
+      if (item.date !== undefined) data.date = new Date(`${String(item.date).slice(0, 10)}T12:00:00`);
+      if (item.location !== undefined) data.location = item.location || null;
+      let publishing = false;
+      if (item.published !== undefined) {
+        const before = await prisma.teamSession.findUnique({ where: { id: item.id } });
+        publishing = before && !before.published && item.published === true;
+        data.published = !!item.published;
+      }
+      const updated = await prisma.teamSession.update({ where: { id: item.id }, data, include: { team: true } });
+      if (publishing) {
+        const enrollments = await prisma.teamEnrollment.findMany({ where: { teamId: updated.teamId }, include: { member: { include: { user: true } } } });
+        await createAttendanceCalls(updated, enrollments);
+      }
       send(res, 200, mapSession(updated));
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     if (req.method === 'DELETE') return body(req).then(async item => { await prisma.teamSession.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });

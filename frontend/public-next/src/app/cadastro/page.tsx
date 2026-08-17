@@ -5,16 +5,13 @@ import {
   ArrowRight, CalendarDays, Check, CheckCircle2, CircleDollarSign, Eye, EyeOff,
   Gift, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Sparkles, Trophy, UserRound,
 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { compexApi } from "@/lib/compex-api";
 import "./signup.css";
 
 type Participation = "SOCIO" | "AVULSO";
 
-const plans = [
-  { name: "Plano Anual", value: "Anual", price: "R$ 49,90", period: "/ano", description: "Acesso à carteirinha, benefícios e eventos por 12 meses." },
-  { name: "Plano Semestral", value: "Semestral", price: "R$ 29,90", period: "/semestre", description: "Todos os benefícios da associação durante 6 meses." },
-];
+type ApiPlan = { id: string; name: string; priceCents: number; period: string; description: string | null };
 
 const courses = [
   "Ciência da Computação", "Sistemas de Informação", "Inteligência Artificial", "Física",
@@ -26,13 +23,22 @@ type CreatedMember = { id: string; membershipKind: Participation; status: string
 
 export default function CadastroPage() {
   const [participation, setParticipation] = useState<Participation>("SOCIO");
-  const [plan, setPlan] = useState("Anual");
+  const [plans, setPlans] = useState<ApiPlan[]>([]);
+  const [planId, setPlanId] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const isMember = participation === "SOCIO";
+  const selectedPlan = plans.find((item) => item.id === planId);
+
+  useEffect(() => {
+    compexApi<ApiPlan[]>("/plans").then((data) => {
+      setPlans(data);
+      if (data.length > 0) setPlanId((current) => current || data[0].id);
+    }).catch(() => setPlans([]));
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +58,7 @@ export default function CadastroPage() {
       birthDate: String(form.get("birthDate") || "") || null,
       phone: String(form.get("phone") || "").trim() || null,
       membershipKind: participation,
-      plan: isMember ? plan : "Avulso",
+      planId: isMember ? planId : undefined,
       memberType: "TORCEDOR",
       status: isMember ? "pending" : "active",
     };
@@ -75,7 +81,7 @@ export default function CadastroPage() {
       <p className="eyebrow">CADASTRO CONCLUÍDO</p>
       <h2>{isMember ? "Sua solicitação está com a matilha." : "Você já faz parte do sistema."}</h2>
       <p>{isMember
-        ? `Recebemos seus dados e a escolha do plano ${plan.toLowerCase()}. A equipe da CompExatas vai analisar sua associação e orientar os próximos passos.`
+        ? `Recebemos seus dados e a escolha do ${selectedPlan ? selectedPlan.name.toLowerCase() : "plano"}. A equipe da CompExatas vai analisar sua associação e orientar os próximos passos.`
         : "Sua conta avulsa foi criada. Você pode entrar no portal, escolher modalidades e pagar somente pelos treinos e jogos dos quais participar."}</p>
       <div className="success-summary"><Check size={16}/><span>{isMember ? "Aguarde a aprovação para liberar carteirinha e benefícios." : "Sem mensalidade e sem cobrança automática."}</span></div>
       <Link className="primary" href="/login">Entrar no portal <ArrowRight size={16}/></Link>
@@ -115,7 +121,8 @@ export default function CadastroPage() {
         <aside className={`plans ${!isMember ? "avulso-panel" : ""}`}>
           {isMember ? <>
             <div className="plans-title"><span>✦</span><div><p className="eyebrow">PLANOS COMPEX</p><h2>Escolha seu plano.</h2></div></div>
-            {plans.map((item) => <label className={`plan ${plan === item.value ? "selected" : ""}`} key={item.value}><input type="radio" name="plan" checked={plan === item.value} onChange={() => setPlan(item.value)} /><span className="plan-icon">{plan === item.value ? "☆" : "◇"}</span><span className="plan-copy"><b>{item.name}</b><small>{item.description}</small></span><strong>{item.price}<small>{item.period}</small></strong></label>)}
+            {plans.length === 0 && <p className="field-hint">Nenhum plano disponível no momento.</p>}
+            {plans.map((item) => <label className={`plan ${planId === item.id ? "selected" : ""}`} key={item.id}><input type="radio" name="plan" checked={planId === item.id} onChange={() => setPlanId(item.id)} /><span className="plan-icon">{planId === item.id ? "☆" : "◇"}</span><span className="plan-copy"><b>{item.name}</b><small>{item.description}</small></span><strong>{(item.priceCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}<small>{item.period}</small></strong></label>)}
             <div className="included"><h3>O que sua associação libera</h3><span><Check size={13}/> Carteirinha digital com QR Code</span><span><Check size={13}/> Condições especiais em treinos</span><span><Check size={13}/> Benefícios dos parceiros</span><span><Check size={13}/> Descontos e experiências exclusivas</span></div>
             <div className="plan-features"><span>▣<small>Carteirinha</small></span><span>♧<small>Benefícios</small></span><span>◇<small>Eventos</small></span><span>♙<small>Comunidade</small></span></div>
           </> : <>

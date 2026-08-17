@@ -1,34 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { KeyRound, LogOut } from "lucide-react";
 import { compexApi, sessionToken } from "@/lib/compex-api";
+import NotificationBell from "./NotificationBell";
 import "./gestao-shell.css";
 
+const ALL_ROLES = ["PRESIDENCIA", "FINANCEIRO", "ESPORTES", "EVENTOS", "MARKETING", "PRODUTOS", "PATRIMONIO"];
+
+// allow[] espelha o GestaoGuard de cada página em /gestao/*, para que o menu nunca mostre
+// um item que vai só redirecionar o usuário de volta ao clicar.
 const NAV = [
-  { href: "/gestao", icon: "⌂", label: "Início" },
-  { href: "/gestao/associados", icon: "◎", label: "Associados" },
-  { href: "/gestao/financeiro", icon: "R$", label: "Financeiro" },
-  { href: "/gestao/esportes", icon: "⌁", label: "Esportes" },
-  { href: "/gestao/campeonatos", icon: "🏆", label: "Campeonatos" },
-  { href: "/gestao/eventos", icon: "◷", label: "Eventos" },
-  { href: "/gestao/patrocinadores", icon: "◈", label: "Patrocinadores" },
-  { href: "/gestao/beneficios", icon: "◇", label: "Benefícios" },
-  { href: "/gestao/produtos", icon: "⛁", label: "Produtos & Pedidos" },
-  { href: "/gestao/patrimonio", icon: "▨", label: "Patrimônio" },
-  { href: "/gestao/comunicacao", icon: "✦", label: "Comunicação" },
-  { href: "/gestao/tarefas", icon: "✓", label: "Tarefas" },
-  { href: "/gestao/documentos", icon: "▤", label: "Documentos" },
-  { href: "/gestao/checkin", icon: "▣", label: "Check-in" },
-  { href: "/gestao/permissoes", icon: "⚙", label: "Permissões" },
-  { href: "/gestao/advertencias", icon: "⚠", label: "Advertências" },
+  { href: "/gestao", icon: "⌂", label: "Início", allow: ALL_ROLES },
+  { href: "/gestao/presidencia", icon: "◉", label: "Central da Presidência", allow: ["PRESIDENCIA"] },
+  { href: "/gestao/associados", icon: "◎", label: "Associados", allow: ALL_ROLES },
+  { href: "/gestao/financeiro", icon: "R$", label: "Financeiro", allow: ["PRESIDENCIA", "FINANCEIRO"] },
+  { href: "/gestao/planos", icon: "♛", label: "Planos de Sócio", allow: ["PRESIDENCIA", "FINANCEIRO"] },
+  { href: "/gestao/esportes", icon: "⌁", label: "Esportes", allow: ["PRESIDENCIA", "ESPORTES"] },
+  { href: "/gestao/campeonatos", icon: "🏆", label: "Campeonatos", allow: ["PRESIDENCIA", "ESPORTES"] },
+  { href: "/gestao/escalas", icon: "☰", label: "Escalas", allow: ["PRESIDENCIA", "ESPORTES", "EVENTOS", "MARKETING"] },
+  { href: "/gestao/eventos", icon: "◷", label: "Eventos", allow: ["PRESIDENCIA", "EVENTOS", "MARKETING"] },
+  { href: "/gestao/patrocinadores", icon: "◈", label: "Patrocinadores", allow: ["PRESIDENCIA", "MARKETING", "EVENTOS"] },
+  { href: "/gestao/beneficios", icon: "◇", label: "Benefícios", allow: ["PRESIDENCIA", "MARKETING"] },
+  { href: "/gestao/produtos", icon: "⛁", label: "Produtos & Pedidos", allow: ["PRESIDENCIA", "PRODUTOS"] },
+  { href: "/gestao/patrimonio", icon: "▨", label: "Patrimônio", allow: ["PRESIDENCIA", "PATRIMONIO", "ESPORTES", "EVENTOS", "FINANCEIRO", "MARKETING"] },
+  { href: "/gestao/comunicacao", icon: "✦", label: "Comunicação", allow: ALL_ROLES },
+  { href: "/gestao/tarefas", icon: "✓", label: "Tarefas", allow: ["PRESIDENCIA", "ESPORTES", "FINANCEIRO", "EVENTOS", "MARKETING", "PRODUTOS", "PATRIMONIO"] },
+  { href: "/gestao/departamentos", icon: "▦", label: "Departamentos", allow: ALL_ROLES },
+  { href: "/gestao/solicitacoes", icon: "✉", label: "Solicitações", allow: ALL_ROLES },
+  { href: "/gestao/reunioes", icon: "▥", label: "Reuniões e Atas", allow: ALL_ROLES },
+  { href: "/gestao/descanso", icon: "☾", label: "Descanso da Gestão", allow: ALL_ROLES },
+  { href: "/gestao/desligamento", icon: "⇥", label: "Desligamento", allow: ALL_ROLES },
+  { href: "/gestao/documentos", icon: "▤", label: "Documentos", allow: ALL_ROLES },
+  { href: "/gestao/checkin", icon: "▣", label: "Check-in", allow: ["PRESIDENCIA", "EVENTOS", "ESPORTES"] },
+  { href: "/gestao/permissoes", icon: "⚙", label: "Permissões", allow: ["PRESIDENCIA"] },
+  { href: "/gestao/auditoria", icon: "▧", label: "Auditoria", allow: ["PRESIDENCIA"] },
+  { href: "/gestao/advertencias", icon: "⚠", label: "Advertências", allow: ALL_ROLES },
 ];
+
+function readRole(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem("compex-session");
+    return raw ? JSON.parse(raw).role : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function GestaoShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [role, setRole] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
+
+  useEffect(() => {
+    setRole(readRole());
+  }, []);
+
+  const visibleNav = role ? NAV.filter((item) => item.allow.includes(role)) : NAV;
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -74,13 +105,14 @@ export default function GestaoShell({ children }: { children: React.ReactNode })
           <span className="shell-brand-text"><strong>COMPEX</strong><span>GESTÃO 2026</span></span>
         </Link>
         <nav className="shell-nav">
-          {NAV.map((item) => (
+          {visibleNav.map((item) => (
             <a key={item.label} href={item.href} className={isActive(item.href) ? "active" : ""}>
               <span className="ic">{item.icon}</span><span>{item.label}</span>
             </a>
           ))}
         </nav>
         <div className="shell-bottom">
+          <NotificationBell />
           <button type="button" onClick={() => setPasswordOpen(true)}><span className="ic"><KeyRound size={14} /></span><span>Trocar senha</span></button>
           <button type="button" onClick={logout}><span className="ic"><LogOut size={14} /></span><span>Sair</span></button>
         </div>

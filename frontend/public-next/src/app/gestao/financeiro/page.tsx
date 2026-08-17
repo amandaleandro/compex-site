@@ -14,9 +14,22 @@ type FinanceEntry = {
   createdAt: string;
 };
 
+type Payable = {
+  id: string;
+  description: string;
+  category: string;
+  amount: number;
+  type: "income" | "expense";
+  dueDate: string | null;
+  favorecido: string | null;
+  requestId: string | null;
+};
+
 type FinanceOverview = {
   entries: FinanceEntry[];
   months: { month: string; income: number; expense: number }[];
+  payables: Payable[];
+  receivables: Payable[];
 };
 
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -27,6 +40,9 @@ const initialEntry = {
   amount: "",
   category: "",
   type: "income" as "income" | "expense",
+  paid: true,
+  dueDate: "",
+  favorecido: "",
 };
 
 export default function FinanceiroPage() {
@@ -71,6 +87,9 @@ export default function FinanceiroPage() {
           amount,
           category: form.category.trim() || "Operação",
           type: form.type,
+          status: form.paid ? "PAID" : "PENDING",
+          dueDate: form.paid ? undefined : form.dueDate || undefined,
+          favorecido: form.favorecido.trim() || undefined,
         }),
       });
       setForm(initialEntry);
@@ -88,6 +107,17 @@ export default function FinanceiroPage() {
       await loadOverview();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível excluir a movimentação.");
+    }
+  };
+
+  const markPaid = async (entry: Payable) => {
+    const proofUrl = window.prompt("URL do comprovante (obrigatório para liquidar):", "");
+    if (!proofUrl) return;
+    try {
+      await compexApi("/transactions", { method: "PUT", body: JSON.stringify({ id: entry.id, status: "PAID", proofUrl }) });
+      await loadOverview();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não foi possível liquidar a movimentação.");
     }
   };
 
@@ -145,6 +175,55 @@ export default function FinanceiroPage() {
           </div>
         </div>
 
+        {((overview?.payables?.length || 0) > 0 || (overview?.receivables?.length || 0) > 0) && (
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <div className="compex-card p-5">
+              <h2 className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-red-700">Contas a pagar ({overview?.payables?.length || 0})</h2>
+              <div className="space-y-2">
+                {(overview?.payables || []).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50/50 p-3">
+                    <div>
+                      <div className="font-bold text-slate-900">{p.description}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {p.category}{p.favorecido ? ` · ${p.favorecido}` : ""}{p.dueDate ? ` · vence ${new Date(p.dueDate).toLocaleDateString("pt-BR")}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-red-700">{money(p.amount)}</span>
+                      <button type="button" onClick={() => markPaid(p)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700">
+                        Marcar pago
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {(overview?.payables?.length || 0) === 0 && <p className="text-sm text-slate-500">Nenhuma conta a pagar em aberto.</p>}
+              </div>
+            </div>
+            <div className="compex-card p-5">
+              <h2 className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-emerald-700">Contas a receber ({overview?.receivables?.length || 0})</h2>
+              <div className="space-y-2">
+                {(overview?.receivables || []).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+                    <div>
+                      <div className="font-bold text-slate-900">{r.description}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {r.category}{r.favorecido ? ` · ${r.favorecido}` : ""}{r.dueDate ? ` · vence ${new Date(r.dueDate).toLocaleDateString("pt-BR")}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-emerald-700">{money(r.amount)}</span>
+                      <button type="button" onClick={() => markPaid(r)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700">
+                        Marcar recebido
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {(overview?.receivables?.length || 0) === 0 && <p className="text-sm text-slate-500">Nenhuma conta a receber em aberto.</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="compex-card mb-6 p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-black text-slate-900">Nova movimentação</h2>
@@ -193,6 +272,33 @@ export default function FinanceiroPage() {
                 <option value="expense">Despesa</option>
               </select>
             </label>
+
+            <label className="block text-sm font-bold text-slate-700">
+              Favorecido
+              <input
+                value={form.favorecido}
+                onChange={(event) => setForm({ ...form, favorecido: event.target.value })}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500"
+                placeholder="Opcional"
+              />
+            </label>
+
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <input type="checkbox" checked={form.paid} onChange={(event) => setForm({ ...form, paid: event.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+              Já foi {form.type === "income" ? "recebido" : "pago"}
+            </label>
+
+            {!form.paid && (
+              <label className="block text-sm font-bold text-slate-700">
+                Vencimento
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(event) => setForm({ ...form, dueDate: event.target.value })}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500"
+                />
+              </label>
+            )}
           </div>
 
           {formError && <p className="mt-3 text-sm font-medium text-red-600">{formError}</p>}

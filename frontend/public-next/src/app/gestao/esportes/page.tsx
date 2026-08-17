@@ -29,6 +29,7 @@ type TeamSession = {
   refereeName: string | null;
   refereeCost: number | null;
   notes: string | null;
+  published: boolean;
 };
 
 const genderLabel: Record<Team["gender"], string> = {
@@ -147,6 +148,15 @@ export default function EsportesPage() {
       setSessionFormError(reason instanceof Error ? reason.message : "Não foi possível salvar o treino/jogo.");
     } finally {
       setSavingSession(false);
+    }
+  };
+
+  const publishSession = async (id: string) => {
+    try {
+      await compexApi("/team-sessions", { method: "PUT", body: JSON.stringify({ id, published: true }) });
+      await loadData();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não foi possível publicar a convocação.");
     }
   };
 
@@ -313,11 +323,19 @@ export default function EsportesPage() {
                                   {session.type}
                                 </span>
                                 {new Date(session.date).toLocaleDateString("pt-BR")}
+                                {session.type === "JOGO" && !session.published && (
+                                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">Convocação não publicada</span>
+                                )}
                               </div>
                               <div className="mt-1 text-xs text-slate-500">
                                 {session.location || "Local a definir"}
                                 {session.coachName ? ` · ${session.coachName}` : ""}
                               </div>
+                              {session.type === "JOGO" && !session.published && (
+                                <button type="button" onClick={() => publishSession(session.id)} className="mt-2 rounded-lg bg-[#0b2265] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#071745]">
+                                  Publicar convocação
+                                </button>
+                              )}
                             </div>
                             {session.coachCost && <span className="text-xs font-bold text-slate-600">{money(session.coachCost)}</span>}
                           </div>

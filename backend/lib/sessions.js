@@ -18,6 +18,9 @@ function resolveSession(token) {
 }
 function bearerToken(req) { return (req.headers.authorization || '').replace('Bearer ', '').trim(); }
 const canManageAccounts = session => !!session && (session.role === 'PRESIDENCIA' || session.rank === 'DIRETOR');
+// Gestão de planos de sócio é restrita à Presidência e ao Financeiro (regra de negócio explícita,
+// mais estreita que canManageAccounts — nem todo diretor pode mexer em preço de mensalidade).
+const canManagePlans = session => !!session && (session.role === 'PRESIDENCIA' || session.role === 'FINANCEIRO');
 function parseCookies(req) {
   const header = req.headers.cookie || '';
   const map = {};
@@ -29,4 +32,4 @@ function parseCookies(req) {
   return map;
 }
 
-module.exports = { sessions, persistSessions, resolveSession, bearerToken, canManageAccounts, parseCookies };
+module.exports = { sessions, persistSessions, resolveSession, bearerToken, canManageAccounts, canManagePlans, parseCookies };

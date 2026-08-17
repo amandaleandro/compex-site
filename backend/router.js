@@ -4,14 +4,21 @@ const { send } = require('./lib/http');
 const { resolveSession, bearerToken } = require('./lib/sessions');
 const { handleAssociateRoute } = require('./associate');
 const { handleGestaoRoutes } = require('./routes/gestao');
+const { handleRequestRoutes } = require('./routes/requests');
+const { handleGestaoInternaRoutes } = require('./routes/gestao-interna');
+const { handleScheduleRoutes } = require('./routes/schedules');
+const { handlePresidenciaSummary } = require('./routes/presidencia');
+const { handleNotificationRoutes } = require('./routes/notifications');
+const { handleDepartmentRoutes } = require('./routes/departments');
+const { handleAuditLogRoutes } = require('./routes/audit-log');
 const { databaseCollection } = require('./routes/collections');
-const { serveUpload, servePage } = require('./routes/static');
+const { serveUpload } = require('./routes/static');
 const { prisma } = require('./db');
 
 // Reproduz, na mesma ordem, o dispatch original de server.js: health/qr → rotas de
 // gestão (auth/diretoria/enquetes/mural/checkins/stats/uploads) → rotas de associado
 // (teams/products/me/checkout/webhooks) → coleções via Prisma (/api/*) → uploads
-// estáticos → páginas HTML do frontend.
+// estáticos. Servir o frontend agora é responsabilidade do Next.js (frontend/public-next).
 async function requestHandler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'compex-portal', time: new Date().toISOString() });
@@ -49,6 +56,27 @@ async function requestHandler(req, res) {
   const handled = await handleGestaoRoutes(url, req, res);
   if (handled) return;
 
+  const requestsHandled = await handleRequestRoutes(url, req, res);
+  if (requestsHandled) return;
+
+  const gestaoInternaHandled = await handleGestaoInternaRoutes(url, req, res);
+  if (gestaoInternaHandled) return;
+
+  const schedulesHandled = await handleScheduleRoutes(url, req, res);
+  if (schedulesHandled) return;
+
+  const presidenciaHandled = await handlePresidenciaSummary(url, req, res);
+  if (presidenciaHandled) return;
+
+  const notificationsHandled = await handleNotificationRoutes(url, req, res);
+  if (notificationsHandled) return;
+
+  const departmentsHandled = await handleDepartmentRoutes(url, req, res);
+  if (departmentsHandled) return;
+
+  const auditLogHandled = await handleAuditLogRoutes(url, req, res);
+  if (auditLogHandled) return;
+
   const associateRoutes = ['/api/teams', '/api/products', '/api/me/', '/api/checkout/', '/api/webhooks/mercadopago'];
   if (url.pathname !== '/api/products/upload' && (associateRoutes.some(prefix => url.pathname === prefix || url.pathname.startsWith(prefix)) || /^\/api\/teams\/[^/]+\/enroll$/.test(url.pathname))) {
     req.associateSession = resolveSession(bearerToken(req));
@@ -56,7 +84,7 @@ async function requestHandler(req, res) {
   }
   if (url.pathname.startsWith('/api/')) return databaseCollection(url.pathname.split('/')[2], req, res, url).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
   if (url.pathname.startsWith('/uploads/') && req.method === 'GET') return serveUpload(req, res, url);
-  return servePage(req, res, url);
+  return send(res, 404, { error: 'Rota não encontrada' });
 }
 
 module.exports = { requestHandler };
