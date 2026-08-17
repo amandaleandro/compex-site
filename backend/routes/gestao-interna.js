@@ -4,7 +4,7 @@ const { send, body } = require('../lib/http');
 const { resolveSession, bearerToken } = require('../lib/sessions');
 const { hasPermission } = require('../lib/permissions');
 const { logAudit } = require('../lib/audit');
-const { notify } = require('../lib/notify');
+const { notify, notifyByPermission, resolvePendency } = require('../lib/notify');
 
 const REST_MAX_DAYS = 30;
 
@@ -45,6 +45,12 @@ async function handleDepartures(url, req, res) {
         },
       });
       await logAudit({ session, action: 'departure.create', entity: 'DepartureRequest', entityId: created.id, after: mapDeparture(created) });
+      notifyByPermission({
+        permission: 'presidencia.aprovar', excludeEmail: session.email,
+        title: 'Desligamento aguardando análise', link: '/gestao/desligamento',
+        message: `${session.name} solicitou desligamento do departamento ${created.department}.`,
+        kind: 'ACIONAVEL', priority: 'ALTA', entity: 'DepartureRequest', entityId: created.id,
+      });
       send(res, 201, mapDeparture(created));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;
@@ -77,6 +83,7 @@ async function handleDepartures(url, req, res) {
       if (['approve', 'reject', 'finalize'].includes(item.action)) {
         notify({ email: updated.requesterEmail, title: 'Desligamento atualizado', message: `Sua solicitação de desligamento foi ${updated.status.toLowerCase()}.`, link: '/gestao/desligamento' });
       }
+      if (['approve', 'reject'].includes(item.action)) await resolvePendency({ entity: 'DepartureRequest', entityId: item.id });
       send(res, 200, mapDeparture(updated));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;
@@ -125,6 +132,12 @@ async function handleRests(url, req, res) {
         },
       });
       await logAudit({ session, action: 'rest.create', entity: 'RestRequest', entityId: created.id, after: mapRest(created) });
+      notifyByPermission({
+        permission: 'presidencia.aprovar', excludeEmail: session.email,
+        title: 'Descanso aguardando aprovação', link: '/gestao/descanso',
+        message: `${session.name} solicitou descanso de ${days} dia(s) (${item.department}).`,
+        kind: 'ACIONAVEL', priority: 'NORMAL', entity: 'RestRequest', entityId: created.id,
+      });
       send(res, 201, mapRest(created));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;
@@ -142,6 +155,7 @@ async function handleRests(url, req, res) {
       const updated = await prisma.restRequest.update({ where: { id: item.id }, data });
       await logAudit({ session, action: `rest.${item.action}`, entity: 'RestRequest', entityId: item.id, before: mapRest(current), after: mapRest(updated) });
       notify({ email: updated.requesterEmail, title: 'Descanso da gestão', message: `Seu pedido de descanso foi ${updated.status.toLowerCase()}.`, link: '/gestao/descanso' });
+      await resolvePendency({ entity: 'RestRequest', entityId: item.id });
       send(res, 200, mapRest(updated));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;
@@ -172,6 +186,7 @@ async function handleMeetings(url, req, res) {
         data: {
           title: item.title, type: item.type || 'Ordinária', date: new Date(item.date), time: item.time || null,
           participants: Array.isArray(item.participants) ? item.participants : undefined,
+          participantEmails: Array.isArray(item.participantEmails) ? item.participantEmails : undefined,
           agenda: item.agenda || null, notes: item.notes || null,
           decisions: Array.isArray(item.decisions) ? item.decisions : undefined,
           attachments: Array.isArray(item.attachments) ? item.attachments : undefined,
@@ -199,6 +214,7 @@ async function handleMeetings(url, req, res) {
         if (item.date !== undefined) data.date = new Date(item.date);
         if (item.time !== undefined) data.time = item.time || null;
         if (item.participants !== undefined) data.participants = item.participants;
+        if (item.participantEmails !== undefined) data.participantEmails = item.participantEmails;
         if (item.agenda !== undefined) data.agenda = item.agenda || null;
         if (item.notes !== undefined) data.notes = item.notes || null;
         if (item.decisions !== undefined) data.decisions = item.decisions;
@@ -206,6 +222,30 @@ async function handleMeetings(url, req, res) {
       }
       const updated = await prisma.meeting.update({ where: { id: item.id }, data });
       await logAudit({ session, action: item.action === 'finalize' ? 'meeting.finalize' : 'meeting.update', entity: 'Meeting', entityId: item.id, before: mapMeeting(current), after: mapMeeting(updated) });
+
+      // Ao virar ata oficial, cada decisão com responsável vira uma tarefa real — fecha o
+      // ciclo Reunião → Ata → Decisão → Tarefa → Responsável → Prazo do pedido, em vez de a
+      // decisão ficar só registrada em texto sem cobrança de ninguém.
+      if (item.action === 'finalize' && Array.isArray(current.decisions)) {
+        for (const decision of current.decisions) {
+          if (!decision || !decision.decision || !decision.responsible) continue;
+          const task = await prisma.task.create({
+            data: {
+              title: decision.decision, team: 'Diretoria', owner: decision.responsible, assigner: session.name,
+              priority: 'media', dueDate: decision.dueDate ? new Date(decision.dueDate) : null, status: 'todo',
+            },
+          });
+          const responsibleUser = await prisma.user.findFirst({ where: { name: decision.responsible } });
+          if (responsibleUser) {
+            notify({
+              email: responsibleUser.email, title: 'Nova tarefa — decisão de reunião', link: '/gestao/tarefas',
+              message: `"${decision.decision}" (decidido em "${updated.title}") ficou sob sua responsabilidade.`,
+              kind: 'ACIONAVEL', priority: 'ALTA', entity: 'Task', entityId: task.id,
+            }).catch(() => {});
+          }
+        }
+      }
+
       send(res, 200, mapMeeting(updated));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;

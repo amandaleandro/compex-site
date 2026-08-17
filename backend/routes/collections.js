@@ -13,6 +13,7 @@ const { teamSlotWeight, chargeSessionParticipants, computeFinanceOverview, creat
 const { transactionCreateSchema, transactionUpdateSchema, validate, IMAGE_MIME_TYPES, NEWS_MEDIA_MIME_TYPES, isAllowedMime } = require('../lib/validation');
 const { normalizeCpf, isValidCpf } = require('../lib/cpf');
 const { logAudit } = require('../lib/audit');
+const { resolvePendency } = require('../lib/notify');
 
 function collection(name, req, res) {
   const data = readData();
@@ -487,14 +488,6 @@ async function databaseCollection(name, req, res, url) {
       }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     }
   }
-  if (name === 'news') {
-    if (req.method === 'GET') return send(res, 200, (await prisma.news.findMany({ where: { published: true }, orderBy: { createdAt: 'desc' } })).map(item => ({ id: item.id, title: item.title, category: item.category, text: item.content, imageUrl: item.imageUrl || null, videoUrl: item.videoUrl || null, date: item.createdAt.toISOString().slice(0, 10) })));
-    const newsSession = resolveSession(bearerToken(req));
-    if (!newsSession || !INTERNAL_ROLES.has(newsSession.role)) return send(res, 401, { error: 'Autenticação necessária' });
-    if (req.method === 'POST') return body(req).then(async item => { const news = await prisma.news.create({ data: { title: item.title, category: item.category || 'Comunicado', content: item.text || item.content || '', imageUrl: item.imageUrl || null, videoUrl: item.videoUrl || null, published: item.published !== false } }); send(res, 201, { id: news.id, title: news.title, category: news.category, text: news.content, imageUrl: news.imageUrl, videoUrl: news.videoUrl, date: news.createdAt.toISOString().slice(0, 10) }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    if (req.method === 'PUT') return body(req).then(async item => { const news = await prisma.news.update({ where: { id: item.id }, data: { title: item.title, category: item.category, content: item.text || item.content, imageUrl: item.imageUrl, videoUrl: item.videoUrl } }); send(res, 200, { id: news.id, title: news.title, category: news.category, text: news.content, imageUrl: news.imageUrl, videoUrl: news.videoUrl, date: news.createdAt.toISOString().slice(0, 10) }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    if (req.method === 'DELETE') return body(req).then(async item => { await prisma.news.delete({ where: { id: item.id } }); send(res, 200, { ok: true }); }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-  }
   if (name === 'athletes') {
     if (req.method === 'GET') return send(res, 200, await prisma.athlete.findMany({ orderBy: { createdAt: 'desc' } }));
     if (req.method === 'POST') return body(req).then(async item => send(res, 201, await prisma.athlete.create({ data: { name: item.name, course: item.course, sport: item.sport, position: item.position, attendance: Number(item.attendance || 0) } }))).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
@@ -700,6 +693,7 @@ async function databaseCollection(name, req, res, url) {
       if (item.priority !== undefined) data.priority = item.priority || 'media';
       if (item.dueDate !== undefined) data.dueDate = item.dueDate ? new Date(`${String(item.dueDate).slice(0, 10)}T12:00:00`) : null;
       const updated = await prisma.task.update({ where: { id: item.id }, data });
+      if (item.status === 'done') await resolvePendency({ entity: 'Task', entityId: item.id });
       send(res, 200, {
         ...updated,
         dueDate: updated.dueDate ? updated.dueDate.toISOString() : null,

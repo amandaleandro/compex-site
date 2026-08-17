@@ -107,7 +107,7 @@ async function handleGestaoRoutes(url, req, res) {
       ? { role: { not: 'ASSOCIADO' }, email: { not: session.email } }
       : { role: session.role, email: { not: session.email } };
     await prisma.user.findMany({ where, orderBy: { createdAt: 'asc' }, include: { member: true } })
-      .then(users => send(res, 200, users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, rank: u.rank, birthDate: u.birthDate ? u.birthDate.toISOString() : null, member: u.member ? { course: u.member.course, plan: u.member.plan, status: u.member.status.toLowerCase() } : null }))))
+      .then(users => send(res, 200, users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, rank: u.rank, phone: u.phone, birthDate: u.birthDate ? u.birthDate.toISOString() : null, member: u.member ? { course: u.member.course, plan: u.member.plan, status: u.member.status.toLowerCase() } : null }))))
       .catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
     return true;
   }
@@ -127,9 +127,9 @@ async function handleGestaoRoutes(url, req, res) {
       }
       const hashed = await bcrypt.hash(item.password || crypto.randomBytes(6).toString('hex'), 10);
       const user = await prisma.user.create({
-        data: { name: item.name, email: (item.email || '').trim().toLowerCase(), password: hashed, role, rank, birthDate: item.birthDate ? new Date(item.birthDate) : null },
+        data: { name: item.name, email: (item.email || '').trim().toLowerCase(), password: hashed, role, rank, phone: item.phone || null, birthDate: item.birthDate ? new Date(item.birthDate) : null },
       });
-      send(res, 201, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: null });
+      send(res, 201, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, phone: user.phone, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: null });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     return true;
   }
@@ -147,6 +147,7 @@ async function handleGestaoRoutes(url, req, res) {
       if (item.email !== undefined) data.email = item.email.trim().toLowerCase();
       if (item.role) data.role = item.role;
       if (item.birthDate !== undefined) data.birthDate = item.birthDate ? new Date(item.birthDate) : null;
+      if (item.phone !== undefined) data.phone = item.phone || null;
       if (item.rank) data.rank = item.rank;
       if (item.role || item.rank) {
         const current = await prisma.user.findUnique({ where: { id: item.id } });
@@ -162,7 +163,7 @@ async function handleGestaoRoutes(url, req, res) {
         }
       }
       const user = await prisma.user.update({ where: { id: item.id }, data, include: { member: true } });
-      send(res, 200, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: user.member ? { course: user.member.course, plan: user.member.plan, status: user.member.status.toLowerCase() } : null });
+      send(res, 200, { id: user.id, name: user.name, email: user.email, role: user.role, rank: user.rank, phone: user.phone, birthDate: user.birthDate ? user.birthDate.toISOString() : null, member: user.member ? { course: user.member.course, plan: user.member.plan, status: user.member.status.toLowerCase() } : null });
     }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
     return true;
   }
@@ -216,109 +217,7 @@ async function handleGestaoRoutes(url, req, res) {
     return true;
   }
   const internalSession = req => { const session = resolveSession(bearerToken(req)); return session && INTERNAL_ROLES.has(session.role) ? session : null; };
-  if (url.pathname === '/api/polls' && req.method === 'GET') {
-    const session = internalSession(req);
-    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
-    if (!prisma) { send(res, 200, []); return true; }
-    const now = new Date();
-    await prisma.poll.findMany({ include: { votes: true }, orderBy: { createdAt: 'desc' } }).then(polls => send(res, 200, polls.map(poll => {
-      const options = poll.options;
-      const results = options.map((option, index) => ({ option, votes: poll.votes.filter(v => v.optionIndex === index).length }));
-      const mine = poll.votes.find(v => v.voterEmail === session.email);
-      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= now : false;
-      const effectiveClosed = poll.closed || isExpired;
-      return {
-        id: poll.id,
-        question: poll.question,
-        options,
-        closed: poll.closed,
-        isExpired,
-        effectiveClosed,
-        expiresAt: poll.expiresAt ? poll.expiresAt.toISOString() : null,
-        createdBy: poll.createdBy,
-        createdAt: poll.createdAt.toISOString(),
-        results,
-        totalVotes: poll.votes.length,
-        myVote: mine ? mine.optionIndex : null
-      };
-    }))).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
-    return true;
-  }
-  if (url.pathname === '/api/polls' && req.method === 'POST') {
-    const session = internalSession(req);
-    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
-    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
-    await body(req).then(async item => {
-      const options = (item.options || []).map(o => String(o).trim()).filter(Boolean);
-      if (!item.question || options.length < 2) return send(res, 400, { error: 'Informe a pergunta e ao menos 2 opções' });
-      let expiresAt = null;
-      if (item.expiresAt) {
-        const parsedDate = new Date(item.expiresAt);
-        if (!isNaN(parsedDate.getTime())) {
-          expiresAt = parsedDate;
-        }
-      }
-      const poll = await prisma.poll.create({ data: { question: item.question, options, expiresAt, createdBy: session.name } });
-      const now = new Date();
-      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= now : false;
-      send(res, 201, {
-        id: poll.id,
-        question: poll.question,
-        options: poll.options,
-        closed: poll.closed,
-        isExpired,
-        effectiveClosed: poll.closed || isExpired,
-        expiresAt: poll.expiresAt ? poll.expiresAt.toISOString() : null,
-        createdBy: poll.createdBy,
-        createdAt: poll.createdAt.toISOString(),
-        results: options.map(option => ({ option, votes: 0 })),
-        totalVotes: 0,
-        myVote: null
-      });
-    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    return true;
-  }
-  const voteMatch = url.pathname.match(/^\/api\/polls\/([^/]+)\/vote$/);
-  if (voteMatch && req.method === 'POST') {
-    const session = internalSession(req);
-    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
-    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
-    await body(req).then(async item => {
-      const poll = await prisma.poll.findUnique({ where: { id: voteMatch[1] } });
-      if (!poll) return send(res, 404, { error: 'Enquete não encontrada' });
-      const isExpired = poll.expiresAt ? new Date(poll.expiresAt) <= new Date() : false;
-      if (poll.closed || isExpired) return send(res, 400, { error: isExpired ? 'Enquete expirada para votação' : 'Enquete encerrada para votação' });
-      await prisma.pollVote.upsert({ where: { pollId_voterEmail: { pollId: poll.id, voterEmail: session.email } }, update: { optionIndex: Number(item.optionIndex) }, create: { pollId: poll.id, voterEmail: session.email, optionIndex: Number(item.optionIndex) } });
-      send(res, 200, { ok: true });
-    }).catch(error => { console.error('[api]', error); return send(res, 400, { error: 'Erro ao processar a solicitação.' }); });
-    return true;
-  }
-  const closeMatch = url.pathname.match(/^\/api\/polls\/([^/]+)\/close$/);
-  if (closeMatch && req.method === 'POST') {
-    const session = internalSession(req);
-    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
-    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
-    await (async () => {
-      const poll = await prisma.poll.update({ where: { id: closeMatch[1] }, data: { closed: true }, include: { votes: true } });
-      const options = poll.options;
-      const results = options.map((option, index) => `${option}: ${poll.votes.filter(v => v.optionIndex === index).length} voto(s)`).join(' · ');
-      await prisma.document.create({ data: { name: `Enquete: ${poll.question}`, category: 'Enquetes', url: '', isPublic: false } }).catch(() => {});
-      send(res, 200, { ok: true, summary: results });
-    })().catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
-    return true;
-  }
-  const deleteMatch = url.pathname.match(/^\/api\/polls\/([^/]+)$/);
-  if (deleteMatch && req.method === 'DELETE') {
-    const session = internalSession(req);
-    if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }
-    if (!prisma) { send(res, 503, { error: 'Banco de dados indisponível' }); return true; }
-    await (async () => {
-      await prisma.pollVote.deleteMany({ where: { pollId: deleteMatch[1] } });
-      await prisma.poll.delete({ where: { id: deleteMatch[1] } });
-      send(res, 200, { ok: true });
-    })().catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
-    return true;
-  }
+  // Rotas de /api/polls* foram movidas para routes/polls.js (fluxo completo de status/validação/empate).
   if (url.pathname === '/api/board' && req.method === 'GET') {
     const session = internalSession(req);
     if (!session) { send(res, 401, { error: 'Autenticação necessária' }); return true; }

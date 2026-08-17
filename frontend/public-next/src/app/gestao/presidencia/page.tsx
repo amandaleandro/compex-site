@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, LoaderCircle } from "lucide-react";
+import { CheckCircle2, LoaderCircle, Sparkles, UserRound } from "lucide-react";
 import GestaoGuard from "@/components/gestao/GestaoGuard";
 import { compexApi } from "@/lib/compex-api";
 
@@ -29,6 +29,8 @@ type Summary = {
     pendingConfirmationsCount: number;
     pendingConfirmations: { sessionId: string; teamName: string; date: string; pendingCount: number }[];
   };
+  needsFollowUp: { email: string; name: string; count: number; sample: string }[];
+  meetingSuggestionCount: number;
 };
 
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -81,10 +83,44 @@ function PresidenciaContent() {
         <p className="text-sm text-slate-500">O que precisa da sua atenção agora — não é um dashboard de números, é uma lista de pendências.</p>
       </header>
 
+      {summary.meetingSuggestionCount >= 3 && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+          <div className="flex items-center gap-3">
+            <Sparkles size={20} className="text-blue-700" />
+            <p className="text-sm font-bold text-blue-900">
+              Existem {summary.meetingSuggestionCount} assuntos relevantes que podem exigir uma reunião de Diretoria.
+            </p>
+          </div>
+          <Link href="/gestao/reunioes?prepare=1" className="rounded-xl bg-[#0b2265] px-4 py-2 text-xs font-bold text-white hover:bg-[#071745]">
+            Preparar reunião
+          </Link>
+        </div>
+      )}
+
       {totalApprovals === 0 && totalAlerts === 0 && summary.finance.overdueCount === 0 && summary.departments.overdueTasksCount === 0 && summary.esportes.incompleteSchedulesCount === 0 && (
         <div className="compex-card mb-6 flex items-center gap-3 p-5 text-emerald-700">
           <CheckCircle2 size={18} />
           Tudo em dia. Nenhuma pendência no momento.
+        </div>
+      )}
+
+      {summary.needsFollowUp.length > 0 && (
+        <div className="compex-card mb-6 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-sm font-black uppercase tracking-[0.14em] text-slate-600"><UserRound size={15} /> Precisam de cobrança</h2>
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">{summary.needsFollowUp.length}</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {summary.needsFollowUp.map((person) => (
+              <div key={person.email} className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/50 p-3">
+                <div>
+                  <p className="font-bold text-slate-900">{person.name}</p>
+                  <p className="text-xs text-slate-500">{person.sample}{person.count > 1 ? ` e mais ${person.count - 1}` : ""}</p>
+                </div>
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-black text-red-700">{person.count}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

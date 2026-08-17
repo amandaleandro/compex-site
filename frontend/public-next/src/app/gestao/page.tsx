@@ -21,6 +21,7 @@ type DashboardExtra = {
 };
 type Poll = { id: string; question: string; options: string[]; expiresAt: string | null; myVote: number | null; totalVotes: number; results: { option: string; votes: number }[]; effectiveClosed: boolean; closed: boolean; isExpired: boolean };
 type BoardPost = { id: string; message: string; authorName: string; createdAt: string };
+type NotificationItem = { id: string; title: string; message: string; link: string | null; kind: "INFORMATIVA" | "ACIONAVEL"; resolved: boolean; priority: "BAIXA" | "NORMAL" | "ALTA" | "CRITICA"; dueAt: string | null };
 
 function sessionRow(s: { teamName: string; date: string; location: string | null; coachName: string | null }, key: string) {
   const date = new Date(s.date);
@@ -81,6 +82,7 @@ function GestaoHome() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [extra, setExtra] = useState<DashboardExtra | null>(null);
   const [polls, setPolls] = useState<Poll[] | null>(null);
+  const [pendencies, setPendencies] = useState<NotificationItem[] | null>(null);
   const [recados, setRecados] = useState<BoardPost[] | null>(null);
   const [elogios, setElogios] = useState<BoardPost[] | null>(null);
   const [monthsWindow, setMonthsWindow] = useState(6);
@@ -98,6 +100,7 @@ function GestaoHome() {
     compexApi<EventItem[]>("/events").then(setEvents).catch(() => setEvents([]));
     compexApi<DashboardExtra>("/dashboard-extra").then(setExtra).catch(() => setExtra(null));
     compexApi<Poll[]>("/polls").then(setPolls).catch(() => setPolls([]));
+    compexApi<{ items: NotificationItem[] }>("/notifications").then((r) => setPendencies(r.items || [])).catch(() => setPendencies([]));
     loadBoard("RECADO", setRecados);
     loadBoard("ELOGIO", setElogios);
     if (session.role === "PRESIDENCIA") compexApi<Director[]>("/directors").then(setDirectors).catch(() => setDirectors([]));
@@ -109,6 +112,20 @@ function GestaoHome() {
     .slice(0, 3), [events]);
 
   const openPolls = (polls || []).filter((p) => !p.effectiveClosed && !p.closed && !p.isExpired);
+  const myPendencies = (pendencies || []).filter((n) => n.kind === "ACIONAVEL" && !n.resolved);
+  const pendencyBuckets = useMemo(() => {
+    const now = new Date();
+    const todayKey = now.toDateString();
+    const buckets = { vencidas: [] as NotificationItem[], hoje: [] as NotificationItem[], proximas: [] as NotificationItem[], semPrazo: [] as NotificationItem[] };
+    for (const n of myPendencies) {
+      if (!n.dueAt) { buckets.semPrazo.push(n); continue; }
+      const due = new Date(n.dueAt);
+      if (due < now && due.toDateString() !== todayKey) buckets.vencidas.push(n);
+      else if (due.toDateString() === todayKey) buckets.hoje.push(n);
+      else buckets.proximas.push(n);
+    }
+    return buckets;
+  }, [myPendencies]);
 
   const vote = async (pollId: string, optionIndex: number) => {
     try {
@@ -167,6 +184,39 @@ function GestaoHome() {
         <div className="compex-card p-4"><p className="text-xs text-slate-500">Eventos publicados</p><strong className="text-2xl font-black text-slate-900">{stats ? String(stats.events).padStart(2, "0") : "--"}</strong></div>
         <div className="compex-card p-4"><p className="text-xs text-slate-500">Atletas cadastrados</p><strong className="text-2xl font-black text-slate-900">{stats ? stats.athletes : "--"}</strong></div>
       </div>
+
+      {myPendencies.length > 0 && (
+        <Panel eyebrow="Suas pendências" title={`${myPendencies.length} pendência(s) aguardando você`} action={<a href="/gestao/tarefas" className="text-xs font-bold text-blue-700">Ver tarefas →</a>}>
+          {([
+            ["vencidas", "Vencidas", "red"],
+            ["hoje", "Hoje", "amber"],
+            ["proximas", "Próximas", "blue"],
+            ["semPrazo", "Sem prazo", "slate"],
+          ] as const).map(([key, label, tone]) => {
+            const group = pendencyBuckets[key];
+            if (group.length === 0) return null;
+            const toneClass = { red: "border-red-100 bg-red-50/60 hover:bg-red-50", amber: "border-amber-100 bg-amber-50/60 hover:bg-amber-50", blue: "border-blue-100 bg-blue-50/60 hover:bg-blue-50", slate: "border-slate-100 bg-slate-50 hover:bg-slate-100" }[tone];
+            const labelClass = { red: "text-red-600", amber: "text-amber-600", blue: "text-blue-600", slate: "text-slate-400" }[tone];
+            return (
+              <div key={key} className="mb-2 last:mb-0">
+                <p className={`mb-1 text-[10px] font-black uppercase tracking-wider ${labelClass}`}>{label} ({group.length})</p>
+                {group.length <= 3 ? (
+                  group.map((n) => (
+                    <a key={n.id} href={n.link || "#"} className={`mb-1.5 block rounded-lg border px-3 py-2 text-sm ${toneClass}`}>
+                      <b className="text-slate-900">{n.title}</b>
+                      <p className="text-xs text-slate-500">{n.message}</p>
+                    </a>
+                  ))
+                ) : (
+                  <p className={`rounded-lg border px-3 py-2 text-sm text-slate-600 ${toneClass}`}>
+                    Você tem <b>{group.length} pendências {label.toLowerCase()}</b> — confira no sino de notificações.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </Panel>
+      )}
 
       {session.role === "PRESIDENCIA" && (
         <Panel eyebrow="Só presidência" title="Diretoria & acessos" action={<a href="/gestao/permissoes" className="text-xs font-bold text-blue-700">Gerenciar permissões →</a>}>

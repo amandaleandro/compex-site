@@ -43,6 +43,8 @@ model User {
   role        Role              @default(ASSOCIADO)
   rank        Rank              @default(DIRETOR)
   permissions Json? // permissões extras concedidas além das padrão do Role (array de strings, ex: ["financeiro.aprovar"])
+  phone       String? // usado para envio de WhatsApp (ver lib/whatsapp-queue.js) — opcional
+  whatsappOptOutInformativas Boolean @default(false) // desliga WhatsApp só de avisos informativos; acionáveis (escala, cobrança) continuam chegando sempre
   active      Boolean           @default(true) // false = desligado da gestão; histórico é preservado, nunca apagado
   leftAt      DateTime?
   birthDate   DateTime?
@@ -395,16 +397,50 @@ model Transaction {
   createdAt       DateTime          @default(now())
 }
 
+enum NewsType {
+  NOTICIA
+  COMUNICADO
+  NOVIDADE
+  RESULTADO
+  EVENTO
+  CAMPANHA
+  CHAMADA
+  AVISO_IMPORTANTE
+}
+
+enum NewsStatus {
+  RASCUNHO
+  EM_REVISAO
+  AGENDADO
+  PUBLICADO
+  ARQUIVADO
+}
+
+// CMS de conteúdo operado principalmente pelo Marketing. `channels` controla onde a
+// publicação aparece (ex: ["HOME", "PORTAL"], ["GESTAO"]). Publicação agendada é
+// promovida a PUBLICADO automaticamente quando `publishAt` é atingido (ver lib/reminders.js).
 model News {
-  id        String   @id @default(cuid())
-  title     String
-  category  String
-  content   String
-  imageUrl  String?
-  videoUrl  String?
-  published Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  title       String
+  type        NewsType   @default(NOTICIA)
+  category    String // rótulo livre exibido na UI (ex: "Campeonato", "Benefícios")
+  summary     String?
+  content     String
+  imageUrl    String?
+  videoUrl    String?
+  authorName  String
+  department  String?
+  status      NewsStatus @default(RASCUNHO)
+  highlighted Boolean    @default(false)
+  channels    Json // array de "HOME" | "PORTAL" | "GESTAO"
+  publishAt   DateTime? // quando definido em AGENDADO, vira PUBLICADO automaticamente nesse instante
+  expiresAt   DateTime?
+  published   Boolean    @default(false) // compat: reflete status === PUBLICADO, mantido para leitores antigos
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([status, publishAt])
 }
 
 model Athlete {
@@ -430,15 +466,42 @@ model Document {
   createdAt    DateTime @default(now())
 }
 
+enum PollStatus {
+  RASCUNHO
+  AGENDADA
+  ABERTA
+  ENCERRADA // "aguardando validação" no fluxo do pedido — resultado calculado, ainda não oficial
+  VALIDADA
+}
+
+// Enquete institucional. `expiresAt` é o encerramento obrigatório (nunca fica nulo a partir
+// do momento em que a enquete é agendada/aberta). Resultado calculado ao encerrar nunca vira
+// oficial sozinho — precisa da ação `validate` (ver routes/polls.js), que registra quem validou.
 model Poll {
-  id        String     @id @default(cuid())
-  question  String
-  options   Json
-  closed    Boolean    @default(false)
-  expiresAt DateTime?
-  createdBy String?
-  createdAt DateTime   @default(now())
-  votes     PollVote[]
+  id               String     @id @default(cuid())
+  title            String     @default("")
+  question         String
+  description      String?
+  rules            String?
+  options          Json
+  audience         Json? // array de Role; null = todos os papéis internos
+  status           PollStatus @default(RASCUNHO)
+  closed           Boolean    @default(false) // compat: reflete status >= ENCERRADA
+  startAt          DateTime?
+  expiresAt        DateTime?
+  tied             Boolean    @default(false)
+  tieBreakMethod   String?
+  officialWinnerIndex Int?
+  validatedByName  String?
+  validatedAt      DateTime?
+  validationNote   String?
+  createdBy        String?
+  createdByEmail   String?
+  createdAt        DateTime   @default(now())
+  votes            PollVote[]
+
+  @@index([status, startAt])
+  @@index([status, expiresAt])
 }
 
 model PollVote {
@@ -818,18 +881,43 @@ model DepartmentPlan {
   updatedAt     DateTime             @updatedAt
 }
 
+enum NotificationKind {
+  INFORMATIVA
+  ACIONAVEL
+}
+
+enum NotificationPriority {
+  BAIXA
+  NORMAL
+  ALTA
+  CRITICA
+}
+
 // Notificação interna — evita depender de WhatsApp para avisar sobre aprovação,
 // escala nova, prazo etc. Lida a partir do próprio sistema.
+// `read` = visualizada (compatibilidade com o sino existente). Para ACIONAVEL, a
+// pendência só é considerada encerrada quando `resolved` vira true — visualizar
+// não basta, ela deve permanecer ativa até a ação real ser concluída.
 model Notification {
-  id        String   @id @default(cuid())
-  userEmail String
-  title     String
-  message   String
-  link      String?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id         String               @id @default(cuid())
+  userEmail  String
+  title      String
+  message    String
+  link       String?
+  read       Boolean              @default(false)
+  kind       NotificationKind     @default(INFORMATIVA)
+  priority   NotificationPriority @default(NORMAL)
+  resolved   Boolean              @default(false)
+  resolvedAt DateTime?
+  entity     String? // tipo do registro de origem (ex: "Schedule", "Request") — motor de pendências
+  entityId   String?
+  remindStage    String? // marca o lembrete/escalonamento já enviado para este entity+entityId (evita duplicar cobrança)
+  popupShownAt   DateTime? // pop-up já exibido uma vez — não repetir a cada troca de página
+  createdAt  DateTime             @default(now())
 
   @@index([userEmail, read])
+  @@index([userEmail, kind, resolved])
+  @@index([entity, entityId])
 }
 
 enum MeetingStatus {
@@ -846,6 +934,7 @@ model Meeting {
   date          DateTime
   time          String?
   participants  Json? // array de nomes
+  participantEmails Json? // array de e-mails — usado para checar disponibilidade/conflitos ao sugerir horário
   agenda        String?
   notes         String?
   decisions     Json? // array de { decision, responsible, dueDate }
@@ -854,4 +943,63 @@ model Meeting {
   createdByName String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+// Disponibilidade recorrente semanal de cada membro — usada para sugerir horário de
+// reunião (não marca nada automaticamente, só orienta a escolha de quem organiza).
+model MemberAvailability {
+  id        String   @id @default(cuid())
+  userEmail String
+  weekday   Int // 0=domingo ... 6=sábado
+  startTime String // "HH:MM"
+  endTime   String // "HH:MM"
+  createdAt DateTime @default(now())
+
+  @@index([userEmail])
+  @@index([weekday])
+}
+
+enum WhatsAppMessageStatus {
+  PENDENTE
+  PROCESSANDO
+  ENVIADO
+  ENTREGUE
+  FALHOU
+  CANCELADO
+}
+
+// Fila de envio do canal WhatsApp (Evolution API) — nada é enviado direto durante a
+// request do usuário; o sweep periódico (lib/reminders.js) processa PENDENTE em lote.
+// Templates ficam em lib/whatsapp-templates.js, nunca hardcoded na rota.
+model WhatsAppMessage {
+  id           String                @id @default(cuid())
+  toPhone      String
+  templateKey  String
+  variables    Json?
+  content      String
+  priority     String                @default("NORMAL") // BAIXA|NORMAL|ALTA|CRITICA — só CRITICA ignora horário de silêncio
+  status       WhatsAppMessageStatus @default(PENDENTE)
+  attempts     Int                   @default(0)
+  maxAttempts  Int                   @default(3)
+  error        String?
+  externalId   String? // id retornado pela Evolution API — usado para casar eventos do webhook
+  linkedEntity String?
+  linkedId     String?
+  createdAt    DateTime              @default(now())
+  sentAt       DateTime?
+  updatedAt    DateTime              @updatedAt
+
+  @@index([status])
+  @@index([externalId])
+  @@index([linkedEntity, linkedId])
+}
+
+// Linha única representando o estado da conexão da instância Evolution — atualizada pelo
+// webhook (ver routes/whatsapp.js). Nunca guarda token/credencial, só status observável.
+model WhatsAppInstanceStatus {
+  id            String   @id @default(cuid())
+  connected     Boolean  @default(false)
+  lastEventType String?
+  lastEventAt   DateTime?
+  updatedAt     DateTime @updatedAt
 }

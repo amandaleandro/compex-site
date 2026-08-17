@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { KeyRound, LogOut } from "lucide-react";
 import { compexApi, sessionToken } from "@/lib/compex-api";
 import NotificationBell from "./NotificationBell";
+import PendencyPopup from "./PendencyPopup";
 import "./gestao-shell.css";
 
 const ALL_ROLES = ["PRESIDENCIA", "FINANCEIRO", "ESPORTES", "EVENTOS", "MARKETING", "PRODUTOS", "PATRIMONIO"];
@@ -27,14 +28,19 @@ const NAV = [
   { href: "/gestao/produtos", icon: "⛁", label: "Produtos & Pedidos", allow: ["PRESIDENCIA", "PRODUTOS"] },
   { href: "/gestao/patrimonio", icon: "▨", label: "Patrimônio", allow: ["PRESIDENCIA", "PATRIMONIO", "ESPORTES", "EVENTOS", "FINANCEIRO", "MARKETING"] },
   { href: "/gestao/comunicacao", icon: "✦", label: "Comunicação", allow: ALL_ROLES },
+  { href: "/gestao/noticias", icon: "📰", label: "Notícias & Comunicados", allow: ["PRESIDENCIA", "MARKETING"] },
+  { href: "/gestao/enquetes", icon: "☑", label: "Enquetes", allow: ALL_ROLES },
   { href: "/gestao/tarefas", icon: "✓", label: "Tarefas", allow: ["PRESIDENCIA", "ESPORTES", "FINANCEIRO", "EVENTOS", "MARKETING", "PRODUTOS", "PATRIMONIO"] },
   { href: "/gestao/departamentos", icon: "▦", label: "Departamentos", allow: ALL_ROLES },
   { href: "/gestao/solicitacoes", icon: "✉", label: "Solicitações", allow: ALL_ROLES },
   { href: "/gestao/reunioes", icon: "▥", label: "Reuniões e Atas", allow: ALL_ROLES },
+  { href: "/gestao/disponibilidade", icon: "◔", label: "Minha Disponibilidade", allow: ALL_ROLES },
   { href: "/gestao/descanso", icon: "☾", label: "Descanso da Gestão", allow: ALL_ROLES },
   { href: "/gestao/desligamento", icon: "⇥", label: "Desligamento", allow: ALL_ROLES },
   { href: "/gestao/documentos", icon: "▤", label: "Documentos", allow: ALL_ROLES },
   { href: "/gestao/checkin", icon: "▣", label: "Check-in", allow: ["PRESIDENCIA", "EVENTOS", "ESPORTES"] },
+  { href: "/gestao/metricas", icon: "📊", label: "Métricas", allow: ["PRESIDENCIA"] },
+  { href: "/gestao/whatsapp", icon: "💬", label: "Integração WhatsApp", allow: ["PRESIDENCIA"] },
   { href: "/gestao/permissoes", icon: "⚙", label: "Permissões", allow: ["PRESIDENCIA"] },
   { href: "/gestao/auditoria", icon: "▧", label: "Auditoria", allow: ["PRESIDENCIA"] },
   { href: "/gestao/advertencias", icon: "⚠", label: "Advertências", allow: ALL_ROLES },
@@ -119,6 +125,8 @@ export default function GestaoShell({ children }: { children: React.ReactNode })
       </aside>
 
       <main className="shell-main">{children}</main>
+
+      <PendencyPopup />
 
       {passwordOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setPasswordOpen(false); }}>

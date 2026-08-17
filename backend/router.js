@@ -11,6 +11,12 @@ const { handlePresidenciaSummary } = require('./routes/presidencia');
 const { handleNotificationRoutes } = require('./routes/notifications');
 const { handleDepartmentRoutes } = require('./routes/departments');
 const { handleAuditLogRoutes } = require('./routes/audit-log');
+const { handleNewsRoutes, handlePublicNews } = require('./routes/news');
+const { handlePollRoutes } = require('./routes/polls');
+const { handleAvailabilityRoutes } = require('./routes/availability');
+const { handleMeetingPlanningRoutes } = require('./routes/meeting-planning');
+const { handleWhatsAppRoutes } = require('./routes/whatsapp');
+const { handleMetricsRoutes } = require('./routes/metrics');
 const { databaseCollection } = require('./routes/collections');
 const { serveUpload } = require('./routes/static');
 const { prisma } = require('./db');
@@ -53,6 +59,21 @@ async function requestHandler(req, res) {
     color: { dark: '#081220', light: '#ffffff' }
   }).then(buffer => send(res, 200, buffer, 'image/png')).catch(error => { console.error('[api]', error); return send(res, 500, { error: 'Erro ao processar a solicitação.' }); });
 
+  const pollsHandled = await handlePollRoutes(url, req, res);
+  if (pollsHandled) return;
+
+  const meetingPlanningHandled = await handleMeetingPlanningRoutes(url, req, res);
+  if (meetingPlanningHandled) return;
+
+  const whatsappHandled = await handleWhatsAppRoutes(url, req, res);
+  if (whatsappHandled) return;
+
+  const metricsHandled = await handleMetricsRoutes(url, req, res);
+  if (metricsHandled) return;
+
+  const availabilityHandled = await handleAvailabilityRoutes(url, req, res);
+  if (availabilityHandled) return;
+
   const handled = await handleGestaoRoutes(url, req, res);
   if (handled) return;
 
@@ -76,6 +97,12 @@ async function requestHandler(req, res) {
 
   const auditLogHandled = await handleAuditLogRoutes(url, req, res);
   if (auditLogHandled) return;
+
+  const publicNewsHandled = await handlePublicNews(url, req, res);
+  if (publicNewsHandled) return;
+
+  const newsHandled = await handleNewsRoutes(url, req, res);
+  if (newsHandled) return;
 
   const associateRoutes = ['/api/teams', '/api/products', '/api/me/', '/api/checkout/', '/api/webhooks/mercadopago'];
   if (url.pathname !== '/api/products/upload' && (associateRoutes.some(prefix => url.pathname === prefix || url.pathname.startsWith(prefix)) || /^\/api\/teams\/[^/]+\/enroll$/.test(url.pathname))) {

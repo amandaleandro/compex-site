@@ -8,7 +8,7 @@ const { send, body } = require('../lib/http');
 const { resolveSession, bearerToken } = require('../lib/sessions');
 const { hasPermission } = require('../lib/permissions');
 const { logAudit } = require('../lib/audit');
-const { notify } = require('../lib/notify');
+const { notify, notifyByPermission, resolvePendency } = require('../lib/notify');
 
 const REQUEST_TYPES = new Set([
   'PAGAMENTO_TECNICO', 'PAGAMENTO_ARBITRAGEM', 'COMPRA_MATERIAIS', 'FERRAMENTA_SOFTWARE',
@@ -18,6 +18,16 @@ const REQUEST_TYPES = new Set([
 const PRIORITIES = new Set(['BAIXA', 'MEDIA', 'ALTA', 'URGENTE']);
 // Tipos que passam pelo fluxo de compras (cotação de fornecedores + confirmação de recebimento).
 const PURCHASE_TYPES = new Set(['COMPRA_MATERIAIS', 'MATERIAL_ESPORTIVO', 'FERRAMENTA_SOFTWARE', 'CONTRATACAO_FORNECEDOR']);
+
+// Quem precisa agir em cada status — usado para transformar a etapa atual numa pendência
+// acionável para quem tem a permissão de aprovação correspondente.
+const STATUS_ACTION_PERMISSION = {
+  SOLICITADO: 'solicitacoes.aprovar',
+  FINANCEIRO: 'financeiro.aprovar',
+  PRESIDENCIA: 'presidencia.aprovar',
+  APROVADO: 'financeiro.pagar',
+  PAGO: 'financeiro.pagar',
+};
 
 const STATUS_LABEL_PT = {
   SOLICITADO: 'solicitada', FINANCEIRO: 'em aprovação do financeiro', PRESIDENCIA: 'em aprovação da presidência',
@@ -133,6 +143,15 @@ async function handleRequestRoutes(url, req, res) {
         },
       });
       await logAudit({ session, action: submit ? 'request.submit' : 'request.create', entity: 'Request', entityId: created.id, after: mapRequest(created) });
+      if (submit && STATUS_ACTION_PERMISSION[created.status]) {
+        notifyByPermission({
+          permission: STATUS_ACTION_PERMISSION[created.status], excludeEmail: session.email,
+          title: 'Solicitação aguardando aprovação', link: '/gestao/solicitacoes',
+          message: `"${created.description}" (${TYPE_LABEL_PT[created.type] || created.type}) precisa da sua aprovação.`,
+          kind: 'ACIONAVEL', priority: 'ALTA', entity: 'Request', entityId: created.id,
+          whatsapp: { templateKey: 'solicitacao_pendente', variables: { descricao: created.description, tipo: TYPE_LABEL_PT[created.type] || created.type } },
+        });
+      }
       send(res, 201, mapRequest(created));
     } catch (error) {
       console.error('[api]', error);
@@ -217,12 +236,26 @@ async function handleRequestRoutes(url, req, res) {
           }
         }
 
+        await resolvePendency({ entity: 'Request', entityId: updated.id });
+
         if (updated.requesterEmail !== session.email && STATUS_LABEL_PT[updated.status]) {
           notify({
             email: updated.requesterEmail,
             title: 'Solicitação atualizada',
             message: `Sua solicitação "${updated.description}" está ${STATUS_LABEL_PT[updated.status]}.`,
             link: '/gestao/solicitacoes',
+            whatsapp: ['PAGO', 'FINALIZADO'].includes(updated.status)
+              ? { templateKey: 'pagamento', variables: { descricao: updated.description, status: STATUS_LABEL_PT[updated.status] } }
+              : undefined,
+          });
+        }
+
+        if (STATUS_ACTION_PERMISSION[updated.status]) {
+          notifyByPermission({
+            permission: STATUS_ACTION_PERMISSION[updated.status], excludeEmail: session.email,
+            title: 'Solicitação aguardando aprovação', link: '/gestao/solicitacoes',
+            message: `"${updated.description}" (${TYPE_LABEL_PT[updated.type] || updated.type}) precisa da sua aprovação.`,
+            kind: 'ACIONAVEL', priority: 'ALTA', entity: 'Request', entityId: updated.id,
           });
         }
 

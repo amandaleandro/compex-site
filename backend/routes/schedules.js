@@ -3,7 +3,7 @@ const { INTERNAL_ROLES } = require('../lib/constants');
 const { send, body } = require('../lib/http');
 const { resolveSession, bearerToken } = require('../lib/sessions');
 const { logAudit } = require('../lib/audit');
-const { notify } = require('../lib/notify');
+const { notify, resolvePendency } = require('../lib/notify');
 
 const FUNCTIONS = new Set([
   'SUMULA', 'APOIO_JOGO', 'BANDEIRAO', 'MATERIAL', 'TORCIDA', 'FOTOGRAFIA', 'SOCIAL_MEDIA',
@@ -39,7 +39,14 @@ async function handleScheduleRoutes(url, req, res) {
         },
       });
       await logAudit({ session, action: 'schedule.create', entity: 'Schedule', entityId: created.id, after: mapSchedule(created) });
-      if (created.assignedEmail) notify({ email: created.assignedEmail, title: 'Nova escala', message: `Você foi escalado(a) para ${created.referenceLabel} (${created.function}).`, link: '/gestao/escalas' });
+      if (created.assignedEmail) {
+        notify({
+          email: created.assignedEmail, title: 'Nova escala', link: '/gestao/escalas',
+          message: `Você foi escalado(a) para ${created.referenceLabel} (${created.function}). Confirme sua disponibilidade.`,
+          kind: 'ACIONAVEL', priority: 'ALTA', entity: 'Schedule', entityId: created.id,
+          whatsapp: { templateKey: 'nova_escala', variables: { referencia: created.referenceLabel, funcao: created.function, data: created.date.toLocaleDateString('pt-BR'), local: created.location || '' } },
+        });
+      }
       send(res, 201, mapSchedule(created));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;
@@ -68,6 +75,9 @@ async function handleScheduleRoutes(url, req, res) {
       }
       const updated = await prisma.schedule.update({ where: { id: item.id }, data });
       await logAudit({ session, action: item.action ? `schedule.${item.action}` : 'schedule.update', entity: 'Schedule', entityId: item.id, before: mapSchedule(current), after: mapSchedule(updated) });
+      if (['confirm', 'unavailable', 'substitute', 'complete'].includes(item.action)) {
+        await resolvePendency({ entity: 'Schedule', entityId: item.id });
+      }
       send(res, 200, mapSchedule(updated));
     } catch (error) { console.error('[api]', error); send(res, 400, { error: 'Erro ao processar a solicitação.' }); }
     return true;

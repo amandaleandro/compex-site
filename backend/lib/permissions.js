@@ -5,6 +5,8 @@ const ROLE_PERMISSIONS = {
     'solicitacoes.criar', 'solicitacoes.aprovar', 'solicitacoes.aprovar_presidencia',
     'financeiro.visualizar', 'financeiro.aprovar', 'financeiro.pagar',
     'departamentos.gerenciar', 'presidencia.aprovar', 'documentos.visualizar',
+    'conteudo.criar', 'conteudo.editar', 'conteudo.publicar', 'conteudo.agendar', 'conteudo.arquivar',
+    'enquetes.validar',
   ],
   FINANCEIRO: [
     'solicitacoes.criar', 'solicitacoes.aprovar', 'solicitacoes.aprovar_financeiro',
@@ -12,7 +14,10 @@ const ROLE_PERMISSIONS = {
   ],
   ESPORTES: ['solicitacoes.criar', 'solicitacoes.aprovar', 'esportes.convocar', 'esportes.publicar_convocacao', 'documentos.visualizar'],
   EVENTOS: ['solicitacoes.criar', 'solicitacoes.aprovar', 'documentos.visualizar'],
-  MARKETING: ['solicitacoes.criar', 'solicitacoes.aprovar', 'documentos.visualizar'],
+  MARKETING: [
+    'solicitacoes.criar', 'solicitacoes.aprovar', 'documentos.visualizar',
+    'conteudo.criar', 'conteudo.editar', 'conteudo.publicar', 'conteudo.agendar', 'conteudo.arquivar',
+  ],
   PRODUTOS: ['solicitacoes.criar', 'solicitacoes.aprovar', 'documentos.visualizar'],
   PATRIMONIO: ['solicitacoes.criar', 'solicitacoes.aprovar', 'documentos.visualizar'],
   ASSOCIADO: ['solicitacoes.criar'],

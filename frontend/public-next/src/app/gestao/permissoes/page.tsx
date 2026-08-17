@@ -14,6 +14,7 @@ type Director = {
   email: string;
   role: Role;
   rank: Rank;
+  phone: string | null;
   birthDate: string | null;
   member: { course: string; plan: string; status: string } | null;
 };
@@ -32,6 +33,7 @@ const initialForm = {
   name: "",
   email: "",
   password: "",
+  phone: "",
   role: "FINANCEIRO" as Role,
   rank: "COORDENADOR" as Rank,
 };
@@ -43,6 +45,8 @@ export default function PermissoesPage() {
   const [form, setForm] = useState(initialForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState<Record<string, string>>({});
+  const [savingPhoneId, setSavingPhoneId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -73,6 +77,7 @@ export default function PermissoesPage() {
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
+          phone: form.phone.trim() || undefined,
           role: form.role,
           rank: form.rank,
         }),
@@ -83,6 +88,18 @@ export default function PermissoesPage() {
       setFormError(reason instanceof Error ? reason.message : "Não foi possível criar a conta.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const savePhone = async (id: string) => {
+    setSavingPhoneId(id);
+    try {
+      await compexApi("/directors", { method: "PUT", body: JSON.stringify({ id, phone: (phoneDraft[id] || "").trim() || null }) });
+      await loadData();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não foi possível salvar o WhatsApp.");
+    } finally {
+      setSavingPhoneId(null);
     }
   };
 
@@ -126,6 +143,10 @@ export default function PermissoesPage() {
               <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500" />
             </label>
             <label className="block text-sm font-bold text-slate-700">
+              WhatsApp (opcional)
+              <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="5534999999999" className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500" />
+            </label>
+            <label className="block text-sm font-bold text-slate-700">
               Área
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500">
                 {(Object.keys(roleLabel) as Role[]).map((role) => (
@@ -165,13 +186,14 @@ export default function PermissoesPage() {
                     <th className="px-5 py-3">Nome</th>
                     <th className="px-5 py-3">Área</th>
                     <th className="px-5 py-3">Nível</th>
+                    <th className="px-5 py-3">WhatsApp</th>
                     <th className="px-5 py-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {directors.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-sm text-slate-500">Nenhuma conta cadastrada.</td>
+                      <td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-500">Nenhuma conta cadastrada.</td>
                     </tr>
                   ) : (
                     directors.map((director) => (
@@ -185,6 +207,19 @@ export default function PermissoesPage() {
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${director.rank === "DIRETOR" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
                             {director.rank === "DIRETOR" ? "Diretor(a)" : "Coordenador(a)"}
                           </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              value={phoneDraft[director.id] ?? director.phone ?? ""}
+                              onChange={(e) => setPhoneDraft((p) => ({ ...p, [director.id]: e.target.value }))}
+                              placeholder="5534999999999"
+                              className="w-32 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                            />
+                            <button type="button" disabled={savingPhoneId === director.id} onClick={() => savePhone(director.id)} className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-200 disabled:opacity-50">
+                              Salvar
+                            </button>
+                          </div>
                         </td>
                         <td className="px-5 py-4">
                           <button type="button" onClick={() => removeDirector(director.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-100">

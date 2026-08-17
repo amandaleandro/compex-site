@@ -32,9 +32,12 @@ function dateLabel(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(value));
 }
 
+type PortalNews = { id: string; slug: string; title: string; summary: string | null; content: string; publishAt: string | null; createdAt: string };
+
 export default function AssociateHome() {
   const { profile, subscription } = useAssociateSession();
   const [events, setEvents] = useState<AgendaEvent[]>([]);
+  const [news, setNews] = useState<PortalNews[]>([]);
   const displayName = profile.socialName || profile.name;
   const greetingName = profile.nickname?.trim()
     || profile.socialName?.trim()
@@ -58,6 +61,12 @@ export default function AssociateHome() {
       .catch(() => setEvents([]));
   }, []);
 
+  useEffect(() => {
+    compexApi<PortalNews[]>("/public-news?channel=PORTAL")
+      .then((items) => setNews((Array.isArray(items) ? items : []).slice(0, 3)))
+      .catch(() => setNews([]));
+  }, []);
+
   const visibleEvents = useMemo(() => events.map((event) => {
     const date = eventDateParts(event.date);
     const category = eventCategory(event);
@@ -74,5 +83,6 @@ export default function AssociateHome() {
     <section className="welcome"><div><p className="eyebrow">MINHA COMPEX / {isAvulso ? "PARTICIPAÇÃO AVULSA" : "ÁREA DO ASSOCIADO"}</p><h1>Olá, {greetingName}.<br /><em>Bom ter você aqui.</em></h1><p>{isAvulso ? "Escolha modalidades, acompanhe a agenda e pague somente pelos treinos e jogos dos quais participar." : "Acompanhe sua carteirinha, eventos, benefícios e novidades da comunidade."}</p></div><Link href={isAvulso ? "/associado/modalidade" : "/associado/carteirinha"} className="primary">{isAvulso ? "♜  Escolher modalidade" : "▣  Abrir minha carteirinha"} <b>→</b></Link><div className="hero-mark"><img src="/compex-logo.png" alt="CompExatas" /></div></section>
     <section className="quick-grid">{shortcuts.map(([title, desc, action, href, Icon]) => <Link href={href} key={href}><span className="icon blue"><Icon size={25}/></span><b>{title}</b><small>{desc}</small><strong>{action} →</strong></Link>)}</section>
     <section className="content-grid"><article className="panel"><div className="panel-head"><div><p className="eyebrow">AGENDA</p><h2>Próximos eventos</h2></div><Link href="/associado/agenda">Ver todos →</Link></div>{visibleEvents.length === 0 ? <div className="event"><b>--<small>--</small></b><div><strong>Nenhum evento publicado</strong><span>Assim que a diretoria publicar novos eventos, eles aparecem aqui.</span><small>⌖ Agenda CompExatas</small></div><Link href="/associado/agenda">Detalhes</Link></div> : visibleEvents.map((event) => <div className="event" key={event.id}><b>{event.day}<small>{event.month}</small></b><div><strong>{event.name}</strong><span>◷ {event.summary}</span><small>⌖ {event.location}</small></div><Link href={`/associado/agenda/${event.id}`}>Detalhes</Link></div>)}</article><article className="panel profile-card"><p className="eyebrow">MEU STATUS</p><h2>{isAvulso ? "Participação avulsa" : `Associação ${active ? "ativa" : "em análise"}`}</h2><div className="status"><span>✓</span><div><b>{displayName}</b><small>{courseName(profile.course)} · UFU</small></div></div><div className="meta"><span>Participação<b>{isAvulso ? "Avulsa" : (subscription.plan || profile.plan)}</b></span><span>{isAvulso ? "Mensalidade" : "Válida até"}<b>{isAvulso ? "R$ 0" : dateLabel(subscription.currentPeriodEnd)}</b></span></div><Link href="/associado/configuracoes">Atualizar meus dados →</Link></article></section>
+    {news.length > 0 && <section style={{ margin: "18px 4.5% 0" }}><article className="panel"><div className="panel-head"><div><p className="eyebrow">NOVIDADES</p><h2>Comunicados da CompExatas</h2></div><Link href="/noticias">Ver todas →</Link></div>{news.map((item) => <div className="event" key={item.id}><b>📰</b><div><strong>{item.title}</strong><span>{item.summary || item.content.slice(0, 120)}</span></div><Link href={`/noticias/${item.slug}`}>Ler</Link></div>)}</article></section>}
   </>;
 }

@@ -1,21 +1,32 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { 
-  Calendar, 
-  Users, 
-  Star, 
-  ArrowUpRight, 
-  Gamepad2, 
-  Activity, 
-  Trophy, 
+import {
+  Calendar,
+  Users,
+  Star,
+  ArrowUpRight,
+  Gamepad2,
+  Activity,
+  Trophy,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Newspaper,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { compexApi } from "@/lib/compex-api";
+
+type HomeNews = { id: string; slug: string; title: string; summary: string | null; content: string };
 
 export default function Home() {
+  const [news, setNews] = useState<HomeNews[]>([]);
+
+  useEffect(() => {
+    compexApi<HomeNews[]>("/public-news?channel=HOME")
+      .then((items) => setNews(items.slice(0, 1)))
+      .catch(() => setNews([]));
+  }, []);
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       
@@ -252,22 +263,24 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 flex items-start gap-4">
-            <div className="w-16 h-16 rounded-xl bg-navy-dark text-amber-400 flex items-center justify-center text-2xl shrink-0">
-              🏆
-            </div>
-            <div className="space-y-1.5">
-              <h4 className="font-bold text-slate-900 text-xs leading-snug">
-                COMPEX confirma presença no Intercomp 2026
-              </h4>
-              <p className="text-[11px] text-slate-500 leading-normal">
-                Nossa equipe já está se preparando para viver mais uma grande edição do campeonato.
-              </p>
-              <Link href="/noticias" className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline pt-1">
-                Ler notícia <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
+          {news.length === 0 ? (
+            <div className="py-10 text-center text-xs text-slate-400">Nenhuma notícia publicada ainda.</div>
+          ) : (
+            news.map((item) => (
+              <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3 flex items-start gap-4">
+                <div className="w-16 h-16 rounded-xl bg-navy-dark text-amber-400 flex items-center justify-center text-2xl shrink-0">
+                  <Newspaper className="w-6 h-6" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-slate-900 text-xs leading-snug">{item.title}</h4>
+                  <p className="text-[11px] text-slate-500 leading-normal">{item.summary || item.content.slice(0, 110)}</p>
+                  <Link href={`/noticias/${item.slug}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline pt-1">
+                    Ler notícia <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Resultados (7 cols) */}

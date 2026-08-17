@@ -15,6 +15,7 @@ async function handlePresidenciaSummary(url, req, res) {
     pendingRequests, pendingDepartures, pendingRests, overdueTransactions,
     openTasks, incompleteSchedules, upcomingGames,
     overdueLoans, unpaidProofTransactions, overdueRequests, pendingAttendances,
+    followUpNotifications, pendingRequestCount, pendingScheduleCount, pendingPollCount, latePlanCount,
   ] = await Promise.all([
     prisma.request.findMany({ where: { status: { in: ['PRESIDENCIA', 'SOLICITADO', 'APROVACAO_DIRETOR', 'FINANCEIRO'] } }, orderBy: { createdAt: 'asc' } }),
     prisma.departureRequest.findMany({ where: { status: { in: ['SOLICITADO', 'EM_ANALISE'] } }, orderBy: { createdAt: 'asc' } }),
@@ -35,7 +36,28 @@ async function handlePresidenciaSummary(url, req, res) {
       include: { session: { include: { team: true } }, member: { include: { user: true } } },
       take: 20,
     }),
+    // "Precisam de cobrança" — pendências acionáveis de alta prioridade, agrupadas por pessoa
+    // (motor de pendências da Etapa 1: toda pendência real do sistema já vira Notification ACIONAVEL).
+    prisma.notification.findMany({ where: { kind: 'ACIONAVEL', resolved: false, priority: { in: ['ALTA', 'CRITICA'] } }, orderBy: { createdAt: 'asc' } }),
+    // Mesma contagem usada em /api/meetings/suggested-agenda — "existem N assuntos que podem
+    // exigir uma reunião" (seção 43), sem duplicar a query de listagem completa aqui.
+    prisma.request.count({ where: { status: { in: ['SOLICITADO', 'FINANCEIRO', 'PRESIDENCIA'] } } }),
+    prisma.schedule.count({ where: { status: 'AGUARDANDO' } }),
+    prisma.poll.count({ where: { status: 'ENCERRADA' } }),
+    prisma.departmentPlan.count({ where: { status: 'ATRASADO' } }),
   ]);
+  const suggestedAgendaCount = pendingRequestCount + pendingScheduleCount + pendingPollCount + latePlanCount;
+
+  const followUpGrouped = Object.values(
+    followUpNotifications.reduce((acc, n) => {
+      if (!acc[n.userEmail]) acc[n.userEmail] = { email: n.userEmail, count: 0, sample: n.title };
+      acc[n.userEmail].count += 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.count - a.count);
+  const followUpUsers = await prisma.user.findMany({ where: { email: { in: followUpGrouped.map(f => f.email) } }, select: { email: true, name: true } });
+  const nameByEmail = new Map(followUpUsers.map(u => [u.email, u.name]));
+  const followUpByPerson = followUpGrouped.map(f => ({ ...f, name: nameByEmail.get(f.email) || f.email }));
 
   send(res, 200, {
     approvals: {
@@ -72,6 +94,11 @@ async function handlePresidenciaSummary(url, req, res) {
       ),
       pendingConfirmationsCount: pendingAttendances.length,
     },
+    // "Precisam de cobrança" (seção 42 do pedido): quem tem mais pendências acionáveis abertas.
+    needsFollowUp: followUpByPerson.slice(0, 10),
+    // "Existem N assuntos relevantes que podem exigir uma reunião" (seção 43) — mesma contagem
+    // usada em /api/meetings/suggested-agenda, só o número, pra não duplicar a query aqui.
+    meetingSuggestionCount: suggestedAgendaCount,
   });
   return true;
 }

@@ -1,5 +1,6 @@
 const { prisma } = require('../db');
 const { paymentClient } = require('../mercadopago');
+const { notify } = require('./notify');
 
 // Vôlei ocupa 2 vagas de esporte do sócio; as demais modalidades ocupam 1.
 function teamSlotWeight(team) { return /v[oô]lei/i.test(team.name) || /v[oô]lei/i.test(team.sport) ? 2 : 1; }
@@ -33,9 +34,18 @@ async function tryGeneratePixForCharge(charge, member, description) {
 // Convocação: assim que um treino/jogo é lançado, todo mundo vinculado à modalidade
 // recebe um pedido de confirmação de presença (independente de cobrança).
 async function createAttendanceCalls(session, enrollments) {
-  await Promise.all(enrollments.map(e =>
-    prisma.sessionAttendance.create({ data: { sessionId: session.id, memberId: e.memberId } }).catch(() => {})
-  ));
+  const eventLabel = `${session.team?.name || ''} · ${session.type === 'JOGO' ? 'Jogo' : 'Treino'}`.trim();
+  const dateLabel = new Date(session.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  await Promise.all(enrollments.map(async e => {
+    const created = await prisma.sessionAttendance.create({ data: { sessionId: session.id, memberId: e.memberId } }).catch(() => null);
+    if (!created || !e.member?.user?.email) return;
+    await notify({
+      email: e.member.user.email, title: 'Convocação', link: '/associado/convocacoes',
+      message: `Você foi convocado(a) para ${eventLabel} em ${dateLabel}. Confirme sua presença.`,
+      kind: 'ACIONAVEL', priority: 'ALTA', entity: 'SessionAttendance', entityId: created.id,
+      whatsapp: { templateKey: 'convocacao', variables: { evento: eventLabel, data: dateLabel, horario: new Date(session.date).toLocaleTimeString('pt-BR', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }) } },
+    }).catch(() => {});
+  }));
 }
 
 async function chargeSessionParticipants(session) {

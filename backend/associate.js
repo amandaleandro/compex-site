@@ -2,6 +2,7 @@ const { prisma } = require('./db');
 const { preferenceClient, preApprovalClient } = require('./mercadopago');
 const { normalizeCpf, isValidCpf } = require('./lib/cpf');
 const { awardPoints, gamificationFor } = require('./lib/gamification');
+const { resolvePendency } = require('./lib/notify');
 
 const DEMO_EMAIL_BY_TOKEN = {
   'demo-session-compex': 'diretoria@compex.com.br',
@@ -166,6 +167,7 @@ async function handleAssociateRoute(pathname, req, res) {
     const status = payload.status === 'DECLINED' ? 'DECLINED' : 'CONFIRMED';
     const updated = await prisma.sessionAttendance.updateMany({ where: { id: attendanceMatch[1], memberId: member.id }, data: { status, respondedAt: new Date() } });
     if (updated.count === 0) return send(res, 404, { error: 'Convocação não encontrada' });
+    await resolvePendency({ entity: 'SessionAttendance', entityId: attendanceMatch[1] });
     return send(res, 200, { ok: true, status: status.toLowerCase() });
   }
 

@@ -1,39 +1,41 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Newspaper, Calendar, ArrowRight, ShieldCheck } from "lucide-react";
+import { Newspaper, Calendar, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { compexApi } from "@/lib/compex-api";
 
-const news = [
-  {
-    id: 1,
-    title: "COMPEX confirma presença no Intercomp 2026",
-    date: "10 SET, 2026",
-    category: "Campeonato",
-    summary: "Nossa equipe já está se preparando para viver mais uma grande edição do campeonato esportivo das exatas."
-  },
-  {
-    id: 2,
-    title: "Abertura dos Treinos Oficiais da Temporada",
-    date: "02 SET, 2026",
-    category: "Treinos",
-    summary: "Todos os alunos matriculados nos cursos de exatas da UFU podem participar das seletivas de futsal, vôlei e eSports."
-  },
-  {
-    id: 3,
-    title: "Novos Parceiros Garantem Descontos em Academias",
-    date: "25 AGO, 2026",
-    category: "Benefícios",
-    summary: "A diretoria firmou acordo com novos estabelecimentos na região universitária oferecendo até 25% OFF para sócios."
-  }
-];
+type NewsItem = {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  content: string;
+  imageUrl: string | null;
+  highlighted: boolean;
+  publishAt: string | null;
+  createdAt: string;
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+}
 
 export default function NoticiasPage() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    compexApi<NewsItem[]>("/public-news?channel=HOME")
+      .then(setNews)
+      .catch(() => setNews([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      
-      {/* Top Banner */}
       <section className="bg-gradient-to-r from-[#071745] via-[#0b2265] to-[#0f2c7a] rounded-3xl p-8 sm:p-12 text-white shadow-lg relative overflow-hidden">
         <div className="space-y-3">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 block">
@@ -49,7 +51,13 @@ export default function NoticiasPage() {
         </div>
       </section>
 
-      {/* Grid de Notícias */}
+      {!loading && news.length === 0 && (
+        <div className="compex-card flex flex-col items-center gap-2 py-16 text-center">
+          <Newspaper className="h-8 w-8 text-slate-300" />
+          <p className="text-sm font-bold text-slate-500">Nenhuma notícia publicada no momento.</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {news.map((n) => (
           <motion.div
@@ -65,15 +73,15 @@ export default function NoticiasPage() {
                 {n.title}
               </h3>
               <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                {n.summary}
+                {n.summary || n.content.slice(0, 140)}
               </p>
               <div className="flex items-center gap-2 text-xs text-slate-400 pt-2 border-t border-slate-100 font-bold">
                 <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>{n.date}</span>
+                <span>{formatDate(n.publishAt || n.createdAt)}</span>
               </div>
             </div>
 
-            <Link href={`/noticias/${n.id}`}
+            <Link href={`/noticias/${n.slug}`}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline pt-2"
             >
               Ler matéria <ArrowRight className="w-3.5 h-3.5" />
@@ -81,7 +89,6 @@ export default function NoticiasPage() {
           </motion.div>
         ))}
       </div>
-
     </div>
   );
 }
